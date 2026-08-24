@@ -1,0 +1,64 @@
+[
+  {
+    "schemeId": "SCHEME-001",
+    "name": {
+      "en": "PM Kisan Samman Nidhi",
+      "hi": "पीएम किसान सम्मान निधि"
+    },
+    "description": {
+      "en": "Financial benefit of Rs 6,000 per year to eligible farmer families.",
+      "hi": "पात्र किसान परिवारों को प्रति वर्ष 6,000 रुपये का वित्तीय लाभ।"
+    },
+    "eligibilityRules": {
+      "minAge": 18,
+      "maxIncome": 100000,
+      "categories": [],
+      "states": []
+    },
+    "benefits": {
+      "en": "Rs 6,000 per year",
+      "hi": "6,000 रुपये प्रति वर्ष"
+    },
+    "applyUrl": "https://pmkisan.gov.in/"
+  },
+  {
+    "schemeId": "SCHEME-002",
+    "name": {
+      "en": "Ayushman Bharat",
+      "hi": "आयुष्मान भारत"
+    },
+    "description": {
+      "en": "Health insurance cover of Rs. 5 lakhs per family per year.",
+      "hi": "प्रति परिवार प्रति वर्ष 5 लाख रुपये का स्वास्थ्य बीमा कवर।"
+    },
+    "eligibilityRules": {
+      "categories": ["SC", "ST", "BPL"],
+      "states": []
+    },
+    "benefits": {
+      "en": "Health insurance cover of Rs. 5 lakhs",
+      "hi": "5 लाख रुपये का स्वास्थ्य बीमा कवर"
+    },
+    "applyUrl": "https://pmjay.gov.in/"
+  },
+  {
+    "schemeId": "SCHEME-003",
+    "name": {
+      "en": "Old Age Pension Scheme",
+      "hi": "वृद्धावस्था पेंशन योजना"
+    },
+    "description": {
+      "en": "Financial assistance to elderly citizens.",
+      "hi": "बुजुर्ग नागरिकों को वित्तीय सहायता।"
+    },
+    "eligibilityRules": {
+      "minAge": 60,
+      "states": []
+    },
+    "benefits": {
+      "en": "Monthly pension",
+      "hi": "मासिक पेंशन"
+    },
+    "applyUrl": "https://nsap.nic.in/"
+  }
+]

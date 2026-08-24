@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Noto Sans', 'Noto Sans Devanagari', Arial, sans-serif; margin: 40px; color: #333; }
+    .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+    h1 { color: #1e3a8a; margin: 0; font-size: 28px; }
+    .subtitle { color: #6b7280; font-size: 16px; margin-top: 10px; }
+    .scheme-details { background: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+    h2 { color: #1f2937; font-size: 22px; margin-top: 0; }
+    .label { font-weight: bold; color: #4b5563; }
+    .value { margin-bottom: 15px; display: block; }
+    .citizen-profile { margin-bottom: 30px; }
+    .footer { text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 50px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>{{titleText}}</h1>
+    <div class="subtitle">{{subtitleText}}</div>
+  </div>
+
+  <div class="scheme-details">
+    <h2>{{schemeName}}</h2>
+    <span class="label">{{descriptionLabel}}:</span>
+    <span class="value">{{schemeDescription}}</span>
+    
+    <span class="label">{{benefitsLabel}}:</span>
+    <span class="value">{{schemeBenefits}}</span>
+
+    <span class="label">{{portalLabel}}:</span>
+    <span class="value">{{applyUrl}}</span>
+  </div>
+
+  <div class="citizen-profile">
+    <h2>{{profileSnapshotText}}</h2>
+    <span class="label">{{phoneLabel}}:</span> <span class="value">{{phone}}</span>
+    <span class="label">{{stateLabel}}:</span> <span class="value">{{state}}</span>
+    <span class="label">{{ageLabel}}:</span> <span class="value">{{age}}</span>
+  </div>
+  
+  <div class="footer">
+    {{generatedOnText}} {{date}} • {{queryIdText}}: {{queryId}}
+  </div>
+</body>
+</html>
