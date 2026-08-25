@@ -1,0 +1,7 @@
+<<<<<<< HEAD
+=======
+.env
+>>>>>>> 1ed3342 (Initial commit)
+node_modules
+package.json
+package-lock.json
