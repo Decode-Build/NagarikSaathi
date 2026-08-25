@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../services/mock_auth_service.dart';
+import '../../services/firebase_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -137,7 +138,7 @@ class _StudentLoginFormState extends ConsumerState<_StudentLoginForm> {
   Future<void> _handleLogin() async {
     setState(() => _isLoading = true);
     try {
-      final authService = ref.read(authServiceProvider);
+      final authService = ref.read(firebaseAuthServiceProvider);
       final student = await authService.loginStudent(
         _nameController.text,
         _rollController.text,
@@ -234,7 +235,7 @@ class _TeacherLoginFormState extends ConsumerState<_TeacherLoginForm> {
   Future<void> _handleLogin() async {
     setState(() => _isLoading = true);
     try {
-      final authService = ref.read(authServiceProvider);
+      final authService = ref.read(firebaseAuthServiceProvider);
       final teacher = await authService.loginTeacher(
         _nameController.text,
         _empIdController.text,
