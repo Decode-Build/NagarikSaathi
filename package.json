@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
   "name": "nagarik-saathi-root",
   "version": "1.0.0",
   "description": "Nagarik Saathi Monorepo Root",
@@ -7,43 +6,17 @@
   "private": true,
   "scripts": {
     "install:backend": "npm install --prefix backend",
-    "install:frontend": "npm install --prefix frontend",
-    "install-all": "npm install && npm run install:backend && npm run install:frontend",
+    "install:frontend": "npm install --prefix frontend/nextjs",
+    "install:legacy": "npm install --prefix frontend/vite",
+    "install-all": "npm install && npm run install:backend && npm run install:frontend && npm run install:legacy",
     "dev:backend": "npm run dev --prefix backend",
-    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:frontend": "npm run dev --prefix frontend/nextjs",
+    "dev:legacy": "npm run dev --prefix frontend/vite",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "build:frontend": "npm run build --prefix frontend"
+    "dev:old": "concurrently \"npm run dev:backend\" \"npm run dev:legacy\"",
+    "build:frontend": "npm run build --prefix frontend/nextjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
-=======
-  "name": "shcema_nagrik",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "axios": "^1.19.0",
-    "bcrypt": "^6.0.0",
-    "bullmq": "^6.2.0",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "ioredis": "^6.0.0",
-    "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.9.3",
-    "puppeteer": "^25.8.0",
-    "winston": "^3.19.0",
-    "zod": "^4.4.3"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
->>>>>>> 1ed3342 (Initial commit)
   }
 }
