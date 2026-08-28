@@ -39,3 +39,12 @@ pnpm-debug.log*
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Python cache files
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
