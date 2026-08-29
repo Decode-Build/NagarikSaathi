@@ -167,7 +167,7 @@ export default function AdminDashboard() {
       if (res.ok) {
         setDraftRules(prev => prev.filter(r => r._id !== id));
         setActiveDraft(null);
-        setNotification("Draft rule approved and promoted to production!");
+        setNotification("Draft rule approved and staged in Pre-Pilot Architecture / Evaluation Mode!");
         setTimeout(() => setNotification(null), 4000);
         fetchLiveStats();
       } else {
@@ -224,7 +224,12 @@ export default function AdminDashboard() {
               ना
             </div>
             <div>
-              <h1 className="text-base font-black text-gray-900 leading-none">NagarikSaathi VLE Hub</h1>
+              <h1 className="text-base font-black text-gray-900 leading-none flex items-center gap-2">
+                NagarikSaathi VLE Hub
+                <span className="bg-amber-100 text-amber-800 border border-amber-250 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-normal">
+                  Pre-Pilot Architecture / Evaluation Mode
+                </span>
+              </h1>
               <span className="text-[10px] text-gray-500 font-semibold">Common Service Centre Operator Dashboard</span>
             </div>
           </div>

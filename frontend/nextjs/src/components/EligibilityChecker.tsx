@@ -116,6 +116,17 @@ export default function EligibilityChecker({ onCheck }: EligibilityCheckerProps)
         </div>
         
         <div className="md:col-span-2 mt-2">
+          <div className="flex items-start gap-2.5 bg-orange-50/55 border border-orange-150 p-3 rounded-lg mb-4 text-xs text-orange-950 font-medium leading-relaxed">
+            <input 
+              type="checkbox" 
+              id="dpdp-consent" 
+              required 
+              className="mt-0.5 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+            />
+            <label htmlFor="dpdp-consent" className="cursor-pointer select-none">
+              <strong>DPDP Act Consent:</strong> I hereby consent to the ephemeral processing of my profile details (state, occupation, gender, marital status, land ownership, income, caste) strictly for the purpose of discovering eligible government schemes. I understand that my queries will be processed in-memory and will not be logged to long-term request databases.
+            </label>
+          </div>
           <button type="submit" className="w-full bg-indigo-600 text-white font-medium py-3 px-4 rounded-md hover:bg-indigo-700 transition-colors">
             Check Eligible Schemes
           </button>

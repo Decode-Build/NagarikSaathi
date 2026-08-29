@@ -103,8 +103,50 @@ export default function Home() {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [printScheme, setPrintScheme] = useState<Scheme | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   const t = translations[lang];
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setIsOnline(window.navigator.onLine);
+
+    const handleOnline = async () => {
+      setIsOnline(true);
+      setSyncStatus("Network reconnected! Synchronizing rules...");
+      
+      try {
+        const res = await fetch(`${API_URL}/v1/schemes/sync?since_version=v1.0`);
+        if (res.ok) {
+          const syncData = await res.json();
+          console.log("Synchronized successfully with latest version:", syncData.latest_version);
+          setSyncStatus(`Sync successful: Running latest version ${syncData.latest_version}`);
+        } else {
+          setSyncStatus("Sync failed: Could not fetch latest updates.");
+        }
+      } catch (err) {
+        console.error("Sync error during reconnection:", err);
+        setSyncStatus("Sync failed: Server unreachable.");
+      }
+      
+      setTimeout(() => setSyncStatus(null), 4000);
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      setSyncStatus("Connection lost. Operating in offline evaluation mode.");
+      setTimeout(() => setSyncStatus(null), 4000);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const fetchInitial = useCallback(async () => {
     try {
@@ -236,6 +278,20 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#FDFBF7] text-gray-900 font-sans selection:bg-orange-200">
+      {/* Network / Sync Status Banners */}
+      {!isOnline && (
+        <div className="bg-red-600 text-white text-xs font-bold py-2 text-center flex items-center justify-center gap-2 border-b border-red-700 animate-pulse sticky top-0 z-50">
+          <span className="w-2 h-2 bg-white rounded-full"></span>
+          <span>Offline Mode: Using cached local rules. Some AI services may be degraded.</span>
+        </div>
+      )}
+      {syncStatus && (
+        <div className="bg-blue-600 text-white text-xs font-bold py-2 text-center flex items-center justify-center gap-2 border-b border-blue-700 sticky top-0 z-50 transition-all duration-300">
+          <span className="w-2 h-2 bg-white rounded-full animate-ping"></span>
+          <span>{syncStatus}</span>
+        </div>
+      )}
+
       {/* Printable Sheet (Shown only during print) */}
       <div className="hidden print:block absolute inset-0 bg-white">
         {printScheme && <PrintableHandout scheme={printScheme} />}
@@ -250,11 +306,14 @@ export default function Home() {
                 {lang === 'en' ? 'N' : 'ना'}
               </div>
               <div>
-                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-red-600 to-amber-700 tracking-tight">
+                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-red-600 to-amber-700 tracking-tight flex items-center gap-2">
                   {t.title}
+                  <span className="text-[9px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-bold tracking-normal uppercase shrink-0">
+                    Evaluation Mode
+                  </span>
                 </h1>
                 <span className="text-[10px] text-gray-500 font-medium block -mt-1">
-                  {lang === 'hi' ? 'कल्याणकारी योजना सहायता मंच' : 'Govt Welfare Scheme Portal'}
+                  {lang === 'hi' ? 'कल्याणकारी योजना सहायता मंच — पूर्व-पायलट मूल्यांकन मोड' : 'Govt Welfare Scheme Portal — Pre-Pilot Architecture / Evaluation Mode'}
                 </span>
               </div>
             </div>
