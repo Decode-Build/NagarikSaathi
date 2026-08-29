@@ -759,7 +759,7 @@ app.post('/api/rules/approve/:id', async (req, res) => {
     draft.status = 'APPROVED';
     await draft.save();
 
-    res.json({ message: "Draft rule successfully approved and promoted to production.", scheme });
+    res.json({ message: "Draft rule successfully approved and staged in Pre-Pilot Architecture / Evaluation Mode.", scheme });
   } catch (err) {
     console.error("Error approving draft rule:", err);
     res.status(500).json({ error: "Failed to approve draft rule. " + err.message });
