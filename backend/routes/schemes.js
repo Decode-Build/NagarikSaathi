@@ -75,8 +75,53 @@ router.post('/eligibility', async (req, res) => {
 
     const matches = await Scheme.find(query);
 
+    // Map schemes with deterministic audit trail, critical linkage bottlenecks, and VLE service fee
+    const enrichedMatches = matches.map(s => {
+      const obj = s.toObject();
+      const reasons = [];
+      if (safeState && (s.eligibility?.states?.includes(safeState) || s.eligibility?.states?.includes('All'))) {
+        reasons.push(`State matches: ${safeState}`);
+      }
+      if (safeOccupation && (s.eligibility?.occupation?.includes(safeOccupation) || s.eligibility?.occupation?.includes('All'))) {
+        reasons.push(`Occupation matches: ${safeOccupation}`);
+      }
+      if (s.eligibility?.maxAnnualIncome && s.eligibility?.maxAnnualIncome < 9999999) {
+        reasons.push(`Income ₹${incomeVal.toLocaleString('en-IN')} ≤ Ceiling ₹${s.eligibility.maxAnnualIncome.toLocaleString('en-IN')}`);
+      }
+      if (s.eligibility?.maxLandAcres) {
+        reasons.push(`Land ${landVal} Acres ≤ Limit ${s.eligibility.maxLandAcres} Acres`);
+      }
+
+      obj.auditTrail = reasons;
+      
+      // Common last-mile bureaucratic linkage prerequisites
+      const bottlenecks = [];
+      if (obj.category?.includes('Direct Benefit Transfer') || obj.category?.includes('Agriculture')) {
+        bottlenecks.push("Aadhaar-NPCI Bank Account Seeding (Check active DBT status at bank/CSC)");
+      }
+      if (obj.eligibility?.minLandAcres !== undefined && obj.eligibility?.maxLandAcres) {
+        bottlenecks.push("Digitized Land Record (Khasra-Khatauni) on State Bhulekh portal");
+      }
+      if (safeCaste && safeCaste !== 'General') {
+        bottlenecks.push("State-issued digital Caste Certificate with digital signature");
+      }
+      if (bottlenecks.length === 0) {
+        bottlenecks.push("Aadhaar Card with active mobile linkage for OTP verification");
+      }
+      obj.linkagePrerequisites = bottlenecks;
+
+      // CSC/VLE Commercial Monetization Schedule
+      obj.vleFeeSchedule = {
+        discoveryConsultation: "Free (Public Service)",
+        formFilingAndKyc: "₹30 – ₹50 (CSC Standard Charge)",
+        documentChecklistPrint: "₹10 – ₹15 (Handout & Lamination)"
+      };
+
+      return obj;
+    });
+
     // Sort: State-specific schemes first, then national schemes
-    const sortedMatches = matches.sort((a, b) => {
+    const sortedMatches = enrichedMatches.sort((a, b) => {
       const aIsStateSpecific = a.eligibility.states.length > 0 && !a.eligibility.states.includes('All');
       const bIsStateSpecific = b.eligibility.states.length > 0 && !b.eligibility.states.includes('All');
       if (aIsStateSpecific && !bIsStateSpecific) return -1;
@@ -205,7 +250,41 @@ router.post('/schemes/:schemeId/report', async (req, res) => {
   }
 });
 
-// 4. GET /api/schemes/:schemeId — keep AFTER specific routes to avoid wildcard conflicts
+// 4. GET /api/schemes — list/search all schemes
+router.get('/schemes', async (req, res) => {
+  try {
+    const { category, state, search } = req.query;
+    let query = {};
+    if (category) {
+      query.category = { $in: [new RegExp(String(category), 'i')] };
+    }
+    if (state && state !== 'All') {
+      query.$or = [
+        { 'eligibility.states': { $size: 0 } },
+        { 'eligibility.states': 'All' },
+        { 'eligibility.states': new RegExp(String(state), 'i') }
+      ];
+    }
+    if (search) {
+      const searchRegex = new RegExp(String(search), 'i');
+      query.$or = [
+        { name: searchRegex },
+        { nameHindi: searchRegex },
+        { description: searchRegex },
+        { descriptionHindi: searchRegex },
+        { category: { $in: [searchRegex] } },
+        { targetGroups: { $in: [searchRegex] } }
+      ];
+    }
+    const schemes = await Scheme.find(query);
+    res.json(schemes);
+  } catch (error) {
+    console.error("Error retrieving schemes:", error);
+    res.status(500).json({ error: "Failed to retrieve schemes." });
+  }
+});
+
+// 5. GET /api/schemes/:schemeId — keep AFTER specific routes to avoid wildcard conflicts
 router.get('/schemes/:schemeId', async (req, res) => {
   const { schemeId } = req.params;
   try {
