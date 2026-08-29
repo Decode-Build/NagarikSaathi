@@ -1,6 +1,10 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Users, FileText, Search, Activity, ArrowLeft, CheckCircle2, RefreshCw, Cpu, Database, Award, BarChart3, Clock } from 'lucide-react';
+import { 
+  Users, FileText, Search, Activity, ArrowLeft, CheckCircle2, 
+  RefreshCw, Cpu, Database, Award, BarChart3, Clock,
+  Check, X, AlertTriangle, FilePlus2, ShieldAlert, Send, Upload
+} from 'lucide-react';
 import Link from 'next/link';
 
 interface StatsData {
@@ -19,6 +23,39 @@ interface StatsData {
     cat: string;
     percent: string;
   }>;
+}
+
+interface DraftRule {
+  _id: string;
+  schemeId: string;
+  name: string;
+  nameHindi?: string;
+  category: string[];
+  targetGroups: string[];
+  eligibility: {
+    occupation: string[];
+    gender: string;
+    maritalStatus: string[];
+    minLandAcres: number;
+    maxLandAcres: number;
+    states: string[];
+    maxAnnualIncome: number;
+    casteCategory: string[];
+  };
+  benefits: string;
+  benefitsHindi?: string;
+  documents: string[];
+  applicationUrl?: string;
+  helplineNumber?: string;
+  description: string;
+  descriptionHindi?: string;
+  ministry?: string;
+  sourceUrl?: string;
+  confidenceScore: number;
+  sourceGazetteReference: string;
+  explicitFieldConstraints: string[];
+  status: string;
+  createdAt: string;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -44,6 +81,14 @@ export default function AdminDashboard() {
   });
   const [health, setHealth] = useState({ status: 'ok', dbState: 'connected', isMockMode: false });
   const [isLoading, setIsLoading] = useState(false);
+
+  // HITL Draft Rule States
+  const [draftRules, setDraftRules] = useState<DraftRule[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [sourceRef, setSourceRef] = useState("");
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [activeDraft, setActiveDraft] = useState<DraftRule | null>(null);
+  const [notification, setNotification] = useState<string | null>(null);
 
   const fetchLiveStats = async () => {
     setIsLoading(true);
@@ -76,9 +121,86 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchPendingRules = async () => {
+    try {
+      const res = await fetch(`${API_URL}/rules/pending`);
+      if (res.ok) {
+        const data = await res.json();
+        setDraftRules(data);
+      }
+    } catch (err) {
+      console.warn("Staging rules query offline/failed:", err);
+    }
+  };
+
+  const handleExtract = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+    setIsExtracting(true);
+    try {
+      const res = await fetch(`${API_URL}/rules/extract`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: inputText, sourceRef })
+      });
+      if (res.ok) {
+        const newDraft = await res.json();
+        setDraftRules(prev => [newDraft, ...prev]);
+        setInputText("");
+        setSourceRef("");
+        setNotification("AI successfully extracted draft rule! Staged for review.");
+        setTimeout(() => setNotification(null), 4000);
+      } else {
+        const errData = await res.json();
+        alert(`Extraction failed: ${errData.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      alert(`Error connecting to extraction API: ${err.message}`);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const handleApprove = async (id: string) => {
+    try {
+      const res = await fetch(`${API_URL}/rules/approve/${id}`, { method: 'POST' });
+      if (res.ok) {
+        setDraftRules(prev => prev.filter(r => r._id !== id));
+        setActiveDraft(null);
+        setNotification("Draft rule approved and promoted to production!");
+        setTimeout(() => setNotification(null), 4000);
+        fetchLiveStats();
+      } else {
+        alert("Failed to approve draft rule.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    try {
+      const res = await fetch(`${API_URL}/rules/reject/${id}`, { method: 'POST' });
+      if (res.ok) {
+        setDraftRules(prev => prev.filter(r => r._id !== id));
+        setActiveDraft(null);
+        setNotification("Draft rule rejected and discarded.");
+        setTimeout(() => setNotification(null), 4000);
+      } else {
+        alert("Failed to reject draft rule.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchLiveStats();
-    const interval = setInterval(fetchLiveStats, 15000);
+    fetchPendingRules();
+    const interval = setInterval(() => {
+      fetchLiveStats();
+      fetchPendingRules();
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -173,6 +295,264 @@ export default function AdminDashboard() {
             </div>
             <h3 className="text-2xl font-black text-amber-700 mt-1">{stats.districtRank}</h3>
             <p className="text-[11px] text-gray-500 font-medium mt-1">Top performing CSC Kendra</p>
+          </div>
+        </div>
+
+        {/* Toast Notification */}
+        {notification && (
+          <div className="bg-emerald-600 text-white font-bold px-4 py-3 rounded-xl shadow-lg flex items-center justify-between animate-fade-in border border-emerald-500 max-w-xl mx-auto -mt-4 mb-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={18} />
+              <span>{notification}</span>
+            </div>
+            <button onClick={() => setNotification(null)} className="text-white hover:text-emerald-100">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Human-in-the-Loop Rule Ingestion & Staging Queue */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
+          <div className="border-b border-gray-100 pb-4 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <ShieldAlert className="text-orange-600" size={20} />
+                <span>Structured HITL Staging Queue & AI Rule Ingestion</span>
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Extract eligibility rules from new official gazette texts. Staged draft rules must be reviewed and manually signed off before publishing.
+              </p>
+            </div>
+            <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+              {draftRules.length} Pending Review
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Form Column: Paste Gazette & Ingest */}
+            <div className="lg:col-span-1 bg-gray-50 rounded-2xl border border-gray-100 p-5 space-y-4">
+              <h3 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                <FilePlus2 className="text-blue-600" size={16} />
+                <span>Ingest New Gazette Notification</span>
+              </h3>
+              
+              <form onSubmit={handleExtract} className="space-y-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-gray-600">Source Gazette Reference / Number</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Gazette Order No. 422-A/2026"
+                    value={sourceRef}
+                    onChange={(e) => setSourceRef(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 font-medium text-gray-800 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all shadow-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-gray-600">Gazette Text Content / Rules</label>
+                  <textarea
+                    rows={8}
+                    required
+                    placeholder="Paste official gazette notification text containing eligibility rules, benefits, and requirements here..."
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 font-medium text-gray-800 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all shadow-sm resize-none"
+                  ></textarea>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isExtracting || !inputText.trim()}
+                  className={`w-full flex items-center justify-center gap-2 text-white font-bold py-2.5 rounded-xl transition-all shadow-md ${
+                    isExtracting || !inputText.trim()
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
+                  }`}
+                >
+                  {isExtracting ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span>Extracting Draft Rule...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send size={14} />
+                      <span>Ingest & Extract via AI</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+
+            {/* Staging Queue List */}
+            <div className="lg:col-span-1 border border-gray-100 rounded-2xl p-5 flex flex-col justify-between max-h-[460px] overflow-y-auto bg-white shadow-inner animate-fade-in">
+              <div className="space-y-4">
+                <h3 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                  <FileText className="text-orange-600" size={16} />
+                  <span>Staged Draft Rules</span>
+                </h3>
+
+                <div className="space-y-3">
+                  {draftRules.map((rule) => {
+                    const confColor =
+                      rule.confidenceScore >= 85
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                        : rule.confidenceScore >= 60
+                        ? "bg-amber-100 text-amber-800 border-amber-200"
+                        : "bg-red-100 text-red-800 border-red-200";
+
+                    return (
+                      <div
+                        key={rule._id}
+                        onClick={() => setActiveDraft(rule)}
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer shadow-sm text-xs ${
+                          activeDraft?._id === rule._id
+                            ? "border-orange-500 bg-orange-50/40 ring-1 ring-orange-500"
+                            : "border-gray-200 hover:bg-gray-50/55"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-2 mb-1.5">
+                          <h4 className="font-bold text-gray-955 leading-tight line-clamp-1">{rule.name}</h4>
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-black border ${confColor}`}>
+                            {rule.confidenceScore}% Conf
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 line-clamp-2 mb-2 font-medium">
+                          {rule.description}
+                        </p>
+                        <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold border-t border-gray-150 pt-2 mt-2">
+                          <span className="truncate max-w-[130px]">{rule.sourceGazetteReference}</span>
+                          <span>{new Date(rule.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {draftRules.length === 0 && (
+                    <div className="text-center py-16 text-xs text-gray-450 font-bold flex flex-col items-center gap-2">
+                      <CheckCircle2 size={32} className="text-emerald-500 animate-pulse" />
+                      <span>Staging queue is empty. All rules reviewed!</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Staged Draft Detail / Review Panel */}
+            <div className="lg:col-span-1 bg-gray-50 rounded-2xl border border-gray-100 p-5 flex flex-col justify-between max-h-[460px] overflow-y-auto">
+              {activeDraft ? (
+                <div className="space-y-4 text-xs flex flex-col justify-between h-full">
+                  <div className="space-y-4">
+                    <div className="border-b border-gray-200 pb-3">
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-100 uppercase tracking-wider">
+                          Reviewing Draft
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-bold font-mono">
+                          ID: {activeDraft.schemeId}
+                        </span>
+                      </div>
+                      <h3 className="font-black text-sm text-gray-900 mt-2 leading-tight">
+                        {activeDraft.name}
+                      </h3>
+                      {activeDraft.nameHindi && (
+                        <p className="text-[11px] font-semibold text-gray-500 mt-1">
+                          {activeDraft.nameHindi}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <span className="font-bold text-gray-600 block mb-1">AI Extracted Constraints</span>
+                        <div className="space-y-1">
+                          {activeDraft.explicitFieldConstraints && activeDraft.explicitFieldConstraints.map((c, i) => (
+                            <div key={i} className="bg-orange-50 border border-orange-100 text-orange-950 px-2 py-1 rounded font-bold text-[10px] flex items-start gap-1">
+                              <span className="text-orange-500 mt-0.5">•</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                          {(!activeDraft.explicitFieldConstraints || activeDraft.explicitFieldConstraints.length === 0) && (
+                            <span className="text-gray-400 italic">No explicit constraints parsed.</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5 bg-white border border-gray-100 p-3 rounded-xl shadow-xs">
+                        <div>
+                          <span className="font-bold text-gray-400 text-[10px] block">Max Income</span>
+                          <span className="font-bold text-gray-800">
+                            {activeDraft.eligibility?.maxAnnualIncome < 9999999
+                              ? `₹${activeDraft.eligibility.maxAnnualIncome.toLocaleString('en-IN')}`
+                              : "No Limit"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-gray-400 text-[10px] block">Max Land Limit</span>
+                          <span className="font-bold text-gray-800">
+                            {activeDraft.eligibility?.maxLandAcres < 9999
+                              ? `${activeDraft.eligibility.maxLandAcres} Acres`
+                              : "No Limit"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-gray-400 text-[10px] block">Applicable State</span>
+                          <span className="font-bold text-gray-800 truncate block">
+                            {activeDraft.eligibility?.states?.join(', ') || "All"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-gray-400 text-[10px] block">Caste Category</span>
+                          <span className="font-bold text-gray-800 truncate block">
+                            {activeDraft.eligibility?.casteCategory?.join(', ') || "All"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="font-bold text-gray-600 block mb-0.5">Benefits Overview</span>
+                        <p className="text-gray-700 leading-relaxed font-medium">
+                          {activeDraft.benefits}
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="font-bold text-gray-600 block mb-0.5">Documents Required</span>
+                        <p className="text-gray-500 font-semibold text-[10px]">
+                          {activeDraft.documents?.join(', ')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 border-t border-gray-200 pt-4 mt-auto">
+                    <button
+                      onClick={() => handleReject(activeDraft._id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 font-bold py-2 rounded-xl transition-all shadow-xs"
+                    >
+                      <X size={14} />
+                      <span>Reject & Discard</span>
+                    </button>
+                    <button
+                      onClick={() => handleApprove(activeDraft._id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl transition-all shadow-md"
+                    >
+                      <Check size={14} />
+                      <span>Approve & Publish</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-28 text-gray-400 font-bold flex flex-col items-center gap-2.5 h-full justify-center">
+                  <ShieldAlert size={40} className="text-gray-300 animate-bounce" />
+                  <div>
+                    <p className="text-gray-600 text-xs">Rule Detail Review Panel</p>
+                    <p className="text-[10px] text-gray-400 font-medium mt-1">Select a staged draft rule from the middle queue to review constraints and publish.</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

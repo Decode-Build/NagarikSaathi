@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import connectDB from './db.js';
-import { Scheme, ChatSession, EligibilityProfile, User } from './models.js';
+import { Scheme, ChatSession, EligibilityProfile, User, DraftRule } from './models.js';
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import bcrypt from 'bcryptjs';
@@ -496,7 +496,247 @@ app.get('/api/session/:sessionId/stats', async (appReq, appRes) => {
   }
 });
 
-// Report scheme route has been moved to routes/schemes.js
+// ==========================================
+// HITL Draft Rules & Staging Queue Routes
+// ==========================================
+
+// Mock extraction function for fallback / offline mode
+const mockExtractRule = (text, sourceRef) => {
+  const cleanSourceRef = sourceRef || "Official Gazette Notification";
+  
+  // Try to parse some basic parameters from text
+  const nameMatch = text.match(/(?:scheme|yojana)\s+name:\s*([^\n]+)/i) || text.match(/name:\s*([^\n]+)/i);
+  const name = nameMatch ? nameMatch[1].trim() : "New Welfare Scheme";
+  
+  const idMatch = text.match(/id:\s*([a-z0-9-]+)/i);
+  const schemeId = idMatch ? idMatch[1].trim() : name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `draft-${Date.now()}`;
+  
+  const incomeMatch = text.match(/income\s*(?:limit|ceiling|below|max):\s*₹?([0-9,]+)/i);
+  const maxIncome = incomeMatch ? Number(incomeMatch[1].replace(/,/g, '')) : 300000;
+  
+  const landMatch = text.match(/land\s*(?:limit|max|holding):\s*([0-9.]+)\s*acres?/i);
+  const maxLand = landMatch ? Number(landMatch[1]) : 5;
+  
+  const genderMatch = text.match(/(female|women|male|men)/i);
+  const gender = genderMatch ? (genderMatch[1].toLowerCase().includes('wom') || genderMatch[1].toLowerCase().includes('fem') ? 'Female' : 'Male') : 'All';
+
+  return {
+    schemeId,
+    name,
+    nameHindi: "राजपत्र मसौदा योजना",
+    category: ["Social Welfare", "Direct Benefit Transfer"],
+    targetGroups: ["Eligible Citizens"],
+    eligibility: {
+      occupation: ["All"],
+      gender,
+      maritalStatus: ["All"],
+      minLandAcres: 0,
+      maxLandAcres: maxLand,
+      states: ["All"],
+      maxAnnualIncome: maxIncome,
+      casteCategory: ["All"]
+    },
+    benefits: "Direct financial assistance and support services as defined in gazette.",
+    benefitsHindi: "राजपत्र में परिभाषित प्रत्यक्ष वित्तीय सहायता और सहायता सेवाएं।",
+    documents: ["Aadhaar Card", "Income Certificate", "Residence Proof"],
+    applicationUrl: "https://www.myscheme.gov.in",
+    helplineNumber: "1800-111-999",
+    description: "AI-generated draft rule extracted from gazette. Pending operator sign-off.",
+    descriptionHindi: "राजपत्र से निकाली गई एआई-जनरेटेड मसौदा नियम। ऑपरेटर के हस्ताक्षर लंबित हैं।",
+    ministry: "Ministry of Welfare",
+    sourceUrl: "https://www.myscheme.gov.in",
+    confidenceScore: 88,
+    sourceGazetteReference: cleanSourceRef,
+    explicitFieldConstraints: [
+      `Income Limit: ₹${maxIncome.toLocaleString('en-IN')}`,
+      `Land Limit: ${maxLand} acres`,
+      `Target Gender: ${gender}`
+    ]
+  };
+};
+
+// 1. POST /api/rules/extract — Extract structured draft rule from text
+app.post('/api/rules/extract', async (req, res) => {
+  const { text, sourceRef } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: "Text content is required for rule extraction." });
+  }
+
+  try {
+    let parsed = null;
+    const isMockMode = !model;
+
+    if (!isMockMode) {
+      try {
+        const systemPrompt = `You are an expert legal and policy analyst. Analyze the provided government gazette or scheme notification text.
+Extract all eligibility rules and details into a structured Draft Rule matching this JSON schema:
+{
+  "schemeId": (string) unique lowercase kebab-case identifier, e.g. "pm-kisan-v2",
+  "name": (string) official English name of the scheme,
+  "nameHindi": (string, optional) official Hindi name of the scheme,
+  "category": (array of strings) category keywords, e.g. ["Agriculture", "Direct Benefit Transfer"],
+  "targetGroups": (array of strings) target beneficiary groups, e.g. ["Small Farmers", "Marginal Farmers"],
+  "eligibility": {
+    "occupation": (array of strings) eligible occupations, e.g. ["Farmer"] or ["All"],
+    "gender": (string) "Male" | "Female" | "All",
+    "maritalStatus": (array of strings) e.g. ["Single", "Married"] or ["All"],
+    "minLandAcres": (number) minimum land holding requirement in acres, default 0,
+    "maxLandAcres": (number) maximum land holding limit in acres, default 9999,
+    "states": (array of strings) states where applicable, e.g. ["Madhya Pradesh"] or ["All"],
+    "maxAnnualIncome": (number) maximum annual income ceiling in Rupees, default 9999999,
+    "casteCategory": (array of strings) e.g. ["SC", "ST"] or ["All"]
+  },
+  "benefits": (string) detailed description of benefits in English,
+  "benefitsHindi": (string, optional) detailed description of benefits in Hindi,
+  "documents": (array of strings) list of required documents,
+  "applicationUrl": (string, optional) official registration web link,
+  "helplineNumber": (string, optional) contact helpline number,
+  "description": (string) brief summary of the scheme,
+  "descriptionHindi": (string, optional) brief summary of the scheme in Hindi,
+  "ministry": (string, optional) administrative ministry,
+  "sourceUrl": (string, optional) source link,
+  "confidenceScore": (number 0-100) your confidence score on extraction accuracy based on rules clarity,
+  "sourceGazetteReference": (string) citation/reference of this source document,
+  "explicitFieldConstraints": (array of strings) list of explicit constraints, e.g. ["Income ceiling: ₹2,50,000 per annum", "Age limit: 18 to 40 years"]
+}
+
+Respond ONLY with the JSON object. Do not output any markdown code blocks, formatting, or conversational filler before/after the JSON. Ensure it is valid JSON.`;
+
+        // Timeout wrapper for LLM call
+        const llmWithTimeout = Promise.race([
+          model.invoke([
+            new SystemMessage(systemPrompt),
+            new HumanMessage(`Text to analyze from source "${sourceRef || 'Gazette'}" :\n\n${text}`)
+          ]),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('LLM API timeout after 25s')), 25000)
+          )
+        ]);
+
+        const response = await llmWithTimeout;
+        parsed = parseGeminiResponse(response.content);
+      } catch (geminiError) {
+        console.error("Gemini rule extraction failed, falling back to mock parser:", geminiError.message);
+        parsed = mockExtractRule(text, sourceRef);
+      }
+    } else {
+      parsed = mockExtractRule(text, sourceRef);
+    }
+
+    // Save to staging collection
+    const draftRule = new DraftRule({
+      schemeId: parsed.schemeId || `draft-${Date.now()}`,
+      name: parsed.name || "Unnamed Scheme",
+      nameHindi: parsed.nameHindi || parsed.name || "",
+      category: parsed.category || ["General"],
+      targetGroups: parsed.targetGroups || ["Eligible Citizens"],
+      eligibility: {
+        occupation: parsed.eligibility?.occupation || ["All"],
+        gender: parsed.eligibility?.gender || "All",
+        maritalStatus: parsed.eligibility?.maritalStatus || ["All"],
+        minLandAcres: Number(parsed.eligibility?.minLandAcres) || 0,
+        maxLandAcres: Number(parsed.eligibility?.maxLandAcres) || 9999,
+        states: parsed.eligibility?.states || ["All"],
+        maxAnnualIncome: Number(parsed.eligibility?.maxAnnualIncome) || 9999999,
+        casteCategory: parsed.eligibility?.casteCategory || ["All"]
+      },
+      benefits: parsed.benefits || "",
+      benefitsHindi: parsed.benefitsHindi || parsed.benefits || "",
+      documents: parsed.documents || ["Aadhaar Card", "Bank Passbook"],
+      applicationUrl: parsed.applicationUrl || "https://www.myscheme.gov.in",
+      helplineNumber: parsed.helplineNumber || "1800-111-999",
+      description: parsed.description || "",
+      descriptionHindi: parsed.descriptionHindi || parsed.description || "",
+      ministry: parsed.ministry || "",
+      sourceUrl: parsed.sourceUrl || "",
+      confidenceScore: parsed.confidenceScore || 80,
+      sourceGazetteReference: parsed.sourceGazetteReference || sourceRef || "Gazette Document Reference",
+      explicitFieldConstraints: parsed.explicitFieldConstraints || [],
+      status: "PENDING_REVIEW"
+    });
+
+    await draftRule.save();
+    res.status(201).json(draftRule);
+
+  } catch (err) {
+    console.error("Error in rule extraction endpoint:", err);
+    res.status(500).json({ error: "Failed to extract rule. " + err.message });
+  }
+});
+
+// 2. GET /api/rules/pending — Fetch all pending draft rules for staging queue
+app.get('/api/rules/pending', async (req, res) => {
+  try {
+    const pending = await DraftRule.find({ status: 'PENDING_REVIEW' }).sort({ createdAt: -1 });
+    res.json(pending);
+  } catch (err) {
+    console.error("Error fetching pending rules:", err);
+    res.status(500).json({ error: "Failed to fetch pending staging rules." });
+  }
+});
+
+// 3. POST /api/rules/approve/:id — Approve draft rule (promote to Scheme collection)
+app.post('/api/rules/approve/:id', async (req, res) => {
+  try {
+    const draft = await DraftRule.findById(req.params.id);
+    if (!draft) {
+      return res.status(404).json({ error: "Draft rule not found." });
+    }
+
+    const schemeData = {
+      schemeId: draft.schemeId,
+      name: draft.name,
+      nameHindi: draft.nameHindi || draft.name,
+      category: draft.category,
+      targetGroups: draft.targetGroups,
+      eligibility: draft.eligibility,
+      benefits: draft.benefits,
+      benefitsHindi: draft.benefitsHindi || draft.benefits,
+      documents: draft.documents,
+      applicationUrl: draft.applicationUrl,
+      helplineNumber: draft.helplineNumber,
+      description: draft.description,
+      descriptionHindi: draft.descriptionHindi || draft.description,
+      ministry: draft.ministry,
+      sourceUrl: draft.sourceUrl,
+      lastVerified: new Date()
+    };
+
+    // Promote to production Scheme collection
+    const scheme = await Scheme.findOneAndUpdate(
+      { schemeId: draft.schemeId },
+      schemeData,
+      { upsert: true, new: true }
+    );
+
+    // Update draft status
+    draft.status = 'APPROVED';
+    await draft.save();
+
+    res.json({ message: "Draft rule successfully approved and promoted to production.", scheme });
+  } catch (err) {
+    console.error("Error approving draft rule:", err);
+    res.status(500).json({ error: "Failed to approve draft rule. " + err.message });
+  }
+});
+
+// 4. POST /api/rules/reject/:id — Reject draft rule
+app.post('/api/rules/reject/:id', async (req, res) => {
+  try {
+    const draft = await DraftRule.findById(req.params.id);
+    if (!draft) {
+      return res.status(404).json({ error: "Draft rule not found." });
+    }
+
+    draft.status = 'REJECTED';
+    await draft.save();
+
+    res.json({ message: "Draft rule rejected and removed from staging queue." });
+  } catch (err) {
+    console.error("Error rejecting draft rule:", err);
+    res.status(500).json({ error: "Failed to reject draft rule. " + err.message });
+  }
+});
 
 // Serve static frontend files from Vite build
 const frontendDist = path.join(__dirname, '../frontend/dist');

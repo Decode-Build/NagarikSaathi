@@ -21,7 +21,7 @@ Task: Identify which schemes genuinely match this user. For each match, score fi
 Only include schemes actually supported by the search data above — do not invent schemes.
 """
     response = gemini_client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         contents=prompt,
         config={
             "response_mime_type": "application/json",
