@@ -61,6 +61,40 @@ export const Scheme = mongoose.model('Scheme', SchemeSchema);
 export const ChatSession = mongoose.model('ChatSession', ChatSessionSchema);
 export const EligibilityProfile = mongoose.model('EligibilityProfile', EligibilityProfileSchema);
 
+const DraftRuleSchema = new mongoose.Schema({
+  schemeId: { type: String, required: true },
+  name: { type: String, required: true },
+  nameHindi: { type: String },
+  category: [{ type: String }],
+  targetGroups: [{ type: String }],
+  eligibility: {
+    occupation: [{ type: String }],
+    gender: { type: String, enum: ['Male', 'Female', 'All'], default: 'All' },
+    maritalStatus: [{ type: String }],
+    minLandAcres: { type: Number, default: 0 },
+    maxLandAcres: { type: Number, default: 9999 },
+    states: [{ type: String }],
+    maxAnnualIncome: { type: Number, default: 9999999 },
+    casteCategory: [{ type: String }]
+  },
+  benefits: { type: String },
+  benefitsHindi: { type: String },
+  documents: [{ type: String }],
+  applicationUrl: { type: String },
+  helplineNumber: { type: String },
+  description: { type: String },
+  descriptionHindi: { type: String },
+  ministry: { type: String },
+  sourceUrl: { type: String },
+  confidenceScore: { type: Number, default: 0 },
+  sourceGazetteReference: { type: String },
+  explicitFieldConstraints: [{ type: String }],
+  status: { type: String, enum: ['PENDING_REVIEW', 'APPROVED', 'REJECTED'], default: 'PENDING_REVIEW' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const DraftRule = mongoose.model('DraftRule', DraftRuleSchema);
+
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -84,4 +118,5 @@ const UserSchema = new mongoose.Schema({
 });
 
 export const User = mongoose.model('User', UserSchema);
+
 

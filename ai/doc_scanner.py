@@ -12,7 +12,7 @@ Inspect it and assess:
 - Give a one-line summary of whether this document is ready to submit.
 """
     response = gemini_client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         contents=[uploaded_file, prompt],
         config={
             "response_mime_type": "application/json",
