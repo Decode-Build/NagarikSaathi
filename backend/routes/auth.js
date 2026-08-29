@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { User } from '../models.js';
+import { zeroStorageComplianceMiddleware } from '../middlewares/compliance.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -39,8 +40,8 @@ export const requireAuth = (req, res, next) => {
   next();
 };
 
-router.post('/register', async (req, res) => {
-  const { username, password, age, occupation, state, gender, maritalStatus, phone } = req.body;
+router.post('/register', zeroStorageComplianceMiddleware, async (req, res) => {
+  const { username, password, age, occupation, state, gender, maritalStatus, phone, is_seeded, identity_status, identity_token } = req.body;
 
   if (!username || !password || !age || !occupation || !state || !gender || !maritalStatus || !phone) {
     return res.status(400).json({ error: "All registration fields including phone number are required." });
@@ -67,7 +68,10 @@ router.post('/register', async (req, res) => {
         occupation,
         state,
         gender,
-        maritalStatus
+        maritalStatus,
+        is_seeded: is_seeded === 'true' || is_seeded === true,
+        identity_status: identity_status || 'UNVERIFIED',
+        identity_token: identity_token || null
       }
     });
 

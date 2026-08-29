@@ -27,7 +27,9 @@ const SchemeSchema = new mongoose.Schema({
   lastVerified: { type: Date, default: Date.now },
   sourceUrl: { type: String },
   flagged: { type: Boolean, default: false },
-  embedding: [{ type: Number }]
+  embedding: [{ type: Number }],
+  version: { type: String, default: 'v1.0' },
+  deleted: { type: Boolean, default: false }
 });
 
 const ChatSessionSchema = new mongoose.Schema({
@@ -90,10 +92,22 @@ const DraftRuleSchema = new mongoose.Schema({
   sourceGazetteReference: { type: String },
   explicitFieldConstraints: [{ type: String }],
   status: { type: String, enum: ['PENDING_REVIEW', 'APPROVED', 'REJECTED'], default: 'PENDING_REVIEW' },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  version: { type: String, default: 'v1.0' }
 });
 
 export const DraftRule = mongoose.model('DraftRule', DraftRuleSchema);
+
+const SchemeVersionSchema = new mongoose.Schema({
+  schemeId: { type: String, required: true },
+  version: { type: String, required: true },
+  schemeData: { type: mongoose.Schema.Types.Mixed, required: true },
+  approvedAt: { type: Date, default: Date.now }
+});
+
+SchemeVersionSchema.index({ schemeId: 1, version: 1 }, { unique: true });
+
+export const SchemeVersion = mongoose.model('SchemeVersion', SchemeVersionSchema);
 
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
@@ -112,7 +126,10 @@ const UserSchema = new mongoose.Schema({
     maritalStatus: { type: String, required: true },
     annualIncome: { type: Number, default: 0 },
     casteCategory: { type: String, default: 'General' },
-    languagePreference: { type: String, default: 'en' }
+    languagePreference: { type: String, default: 'en' },
+    is_seeded: { type: Boolean, default: false },
+    identity_status: { type: String, default: 'UNVERIFIED' },
+    identity_token: { type: String, default: null }
   },
   createdAt: { type: Date, default: Date.now }
 });

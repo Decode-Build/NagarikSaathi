@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import connectDB from './db.js';
-import { Scheme, ChatSession, EligibilityProfile, User, DraftRule } from './models.js';
+import { Scheme, ChatSession, EligibilityProfile, User, DraftRule, SchemeVersion } from './models.js';
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import bcrypt from 'bcryptjs';
@@ -12,6 +12,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { dpdpPurposeLimitationMiddleware, zeroStorageComplianceMiddleware } from './middlewares/compliance.js';
+
+const ephemeralSessions = new Map();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +28,7 @@ const allowedOrigins = process.env.CORS_ORIGIN
   : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000'];
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
+app.use(zeroStorageComplianceMiddleware);
 
 // Connect Database
 connectDB();
@@ -200,7 +204,7 @@ const chatLimiter = rateLimit({
 });
 
 // 1. POST /api/chat
-app.post('/api/chat', chatLimiter, async (appReq, appRes) => {
+app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appReq, appRes) => {
   const { message, sessionId, sessionType } = appReq.body;
 
   if (!message || !sessionId) {
@@ -209,15 +213,31 @@ app.post('/api/chat', chatLimiter, async (appReq, appRes) => {
 
   try {
     // Retrieve or create chat session
-    let session = await ChatSession.findOne({ sessionId });
-    if (!session) {
-      session = new ChatSession({
-        sessionId,
-        sessionType: sessionType || 'self',
-        messages: []
-      });
-    } else if (sessionType) {
-      session.sessionType = sessionType;
+    let session;
+    if (appReq.dpdpEphemeral) {
+      if (!ephemeralSessions.has(sessionId)) {
+        ephemeralSessions.set(sessionId, {
+          sessionId,
+          sessionType: sessionType || 'self',
+          messages: [],
+          save: async function() { return this; }
+        });
+      }
+      session = ephemeralSessions.get(sessionId);
+      if (sessionType) {
+        session.sessionType = sessionType;
+      }
+    } else {
+      session = await ChatSession.findOne({ sessionId });
+      if (!session) {
+        session = new ChatSession({
+          sessionId,
+          sessionType: sessionType || 'self',
+          messages: []
+        });
+      } else if (sessionType) {
+        session.sessionType = sessionType;
+      }
     }
 
     // Fetch all schemes to build context
@@ -419,10 +439,13 @@ Respond ONLY with the JSON structure. Do not output any conversational filler be
 });
 
 // 2. GET /api/chat/:sessionId
-app.post('/api/chat/history', async (appReq, appRes) => {
+app.post('/api/chat/history', dpdpPurposeLimitationMiddleware, async (appReq, appRes) => {
   // Support both GET and POST for session initialization/history
   const { sessionId } = appReq.body;
   try {
+    if (appReq.dpdpEphemeral && ephemeralSessions.has(sessionId)) {
+      return appRes.json(ephemeralSessions.get(sessionId));
+    }
     const session = await ChatSession.findOne({ sessionId });
     if (!session) {
       return appRes.json({ messages: [] });
@@ -433,9 +456,12 @@ app.post('/api/chat/history', async (appReq, appRes) => {
   }
 });
 
-app.get('/api/chat/:sessionId', async (appReq, appRes) => {
+app.get('/api/chat/:sessionId', dpdpPurposeLimitationMiddleware, async (appReq, appRes) => {
   const { sessionId } = appReq.params;
   try {
+    if (appReq.dpdpEphemeral && ephemeralSessions.has(sessionId)) {
+      return appRes.json(ephemeralSessions.get(sessionId));
+    }
     const session = await ChatSession.findOne({ sessionId });
     if (!session) {
       return appRes.json({ messages: [] });
@@ -683,6 +709,16 @@ app.post('/api/rules/approve/:id', async (req, res) => {
       return res.status(404).json({ error: "Draft rule not found." });
     }
 
+    const version = req.body.version || draft.version || 'v1.0';
+
+    // Enforce immutable version tag check
+    const existingVersion = await SchemeVersion.findOne({ schemeId: draft.schemeId, version });
+    if (existingVersion) {
+      return res.status(400).json({
+        error: `Immutable version error: Scheme "${draft.schemeId}" with version "${version}" has already been approved and cannot be overwritten.`
+      });
+    }
+
     const schemeData = {
       schemeId: draft.schemeId,
       name: draft.name,
@@ -699,6 +735,8 @@ app.post('/api/rules/approve/:id', async (req, res) => {
       descriptionHindi: draft.descriptionHindi || draft.description,
       ministry: draft.ministry,
       sourceUrl: draft.sourceUrl,
+      version: version,
+      deleted: false,
       lastVerified: new Date()
     };
 
@@ -708,6 +746,14 @@ app.post('/api/rules/approve/:id', async (req, res) => {
       schemeData,
       { upsert: true, new: true }
     );
+
+    // Save the new version in the SchemeVersion collection to enforce immutability
+    const schemeVerDoc = new SchemeVersion({
+      schemeId: draft.schemeId,
+      version: version,
+      schemeData: schemeData
+    });
+    await schemeVerDoc.save();
 
     // Update draft status
     draft.status = 'APPROVED';

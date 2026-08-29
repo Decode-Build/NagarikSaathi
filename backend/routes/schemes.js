@@ -1,25 +1,28 @@
 import express from 'express';
 import { Scheme, EligibilityProfile, ChatSession } from '../models.js';
+import { dpdpPurposeLimitationMiddleware } from '../middlewares/compliance.js';
 
 const router = express.Router();
 
 // 3. POST /api/eligibility
-router.post('/eligibility', async (req, res) => {
+router.post('/eligibility', dpdpPurposeLimitationMiddleware, async (req, res) => {
   const { sessionId, state, occupation, gender, maritalStatus, landAcres, annualIncome, casteCategory } = req.body;
 
   try {
-    // Save profile for tracking
-    const profile = new EligibilityProfile({
-      sessionId: String(sessionId || `eligibility-${Date.now()}`),
-      state: String(state),
-      occupation: String(occupation),
-      gender: String(gender),
-      maritalStatus: String(maritalStatus),
-      landAcres: Number(landAcres) || 0,
-      annualIncome: Number(annualIncome) || 0,
-      casteCategory: String(casteCategory || 'General')
-    });
-    await profile.save();
+    // Save profile for tracking, bypass if DPDP Purpose Limitation is enabled
+    if (!req.dpdpEphemeral) {
+      const profile = new EligibilityProfile({
+        sessionId: String(sessionId || `eligibility-${Date.now()}`),
+        state: String(state),
+        occupation: String(occupation),
+        gender: String(gender),
+        maritalStatus: String(maritalStatus),
+        landAcres: Number(landAcres) || 0,
+        annualIncome: Number(annualIncome) || 0,
+        casteCategory: String(casteCategory || 'General')
+      });
+      await profile.save();
+    }
     
     const landVal = Number(landAcres) || 0;
     // Fix: explicitly check for undefined/null so income=0 is honoured, not defaulted to max
@@ -295,6 +298,66 @@ router.get('/schemes/:schemeId', async (req, res) => {
     res.json(scheme);
   } catch (error) {
     res.status(500).json({ error: "Failed to retrieve scheme." });
+  }
+});
+
+// Semantic Version Comparison Helper
+export function compareSemVer(v1, v2) {
+  const p1 = String(v1).replace(/^v/, '').split('.').map(Number);
+  const p2 = String(v2).replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const n1 = p1[i] || 0;
+    const n2 = p2[i] || 0;
+    if (n1 > n2) return 1;
+    if (n1 < n2) return -1;
+  }
+  return 0;
+}
+
+const getLatestVersion = (schemes) => {
+  if (!schemes || schemes.length === 0) return 'v1.0';
+  let maxV = 'v1.0';
+  schemes.forEach(s => {
+    const v = s.version || 'v1.0';
+    if (compareSemVer(v, maxV) > 0) {
+      maxV = v;
+    }
+  });
+  return maxV;
+};
+
+// GET /api/v1/schemes/sync?since_version=v2.0
+router.get('/v1/schemes/sync', async (req, res) => {
+  const { since_version } = req.query;
+  try {
+    const allSchemes = await Scheme.find({});
+    
+    if (!since_version) {
+      // If no version specified, return all active (non-deleted) schemes
+      const activeSchemes = allSchemes.filter(s => !s.deleted);
+      return res.json({
+        latest_version: getLatestVersion(allSchemes),
+        deltas: activeSchemes
+      });
+    }
+
+    // Filter schemes that have a version strictly greater than since_version
+    const deltas = allSchemes.filter(scheme => {
+      const schemeVersion = scheme.version || 'v1.0';
+      return compareSemVer(schemeVersion, since_version) > 0;
+    });
+
+    const latestVersion = getLatestVersion(allSchemes);
+    const finalLatest = compareSemVer(latestVersion, since_version) > 0 ? latestVersion : since_version;
+
+    res.json({
+      since_version,
+      latest_version: finalLatest,
+      deltas
+    });
+  } catch (error) {
+    console.error("Sync error:", error);
+    res.status(500).json({ error: "Failed to perform differential sync." });
   }
 });
 
