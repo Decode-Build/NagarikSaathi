@@ -253,6 +253,20 @@ router.post('/schemes/:schemeId/report', async (req, res) => {
   }
 });
 
+// Cosine similarity helper
+const cosineSimilarity = (vecA, vecB) => {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+};
+
 // 4. GET /api/schemes — list/search all schemes
 router.get('/schemes', async (req, res) => {
   try {
@@ -268,18 +282,71 @@ router.get('/schemes', async (req, res) => {
         { 'eligibility.states': new RegExp(String(state), 'i') }
       ];
     }
-    if (search) {
-      const searchRegex = new RegExp(String(search), 'i');
-      query.$or = [
-        { name: searchRegex },
-        { nameHindi: searchRegex },
-        { description: searchRegex },
-        { descriptionHindi: searchRegex },
-        { category: { $in: [searchRegex] } },
-        { targetGroups: { $in: [searchRegex] } }
-      ];
-    }
     const schemes = await Scheme.find(query);
+
+    if (search) {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (apiKey) {
+        try {
+          const { GoogleGenerativeAIEmbeddings } = await import("@langchain/google-genai");
+          const embeddings = new GoogleGenerativeAIEmbeddings({
+            modelName: "gemini-embedding-2",
+            apiKey: apiKey
+          });
+
+          // Timeout wrapper: embedding must complete within 8 seconds
+          const embedWithTimeout = Promise.race([
+            embeddings.embedQuery(String(search)),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Embedding API timeout after 8s')), 8000)
+            )
+          ]);
+          const queryVector = await embedWithTimeout;
+
+          const scoredSchemes = schemes.map(scheme => {
+            let score = 0;
+            if (scheme.embedding && scheme.embedding.length > 0) {
+              score = cosineSimilarity(queryVector, scheme.embedding);
+            }
+            return { ...scheme.toObject(), score };
+          });
+
+          // Sort by similarity score and filter to reasonable matches
+          const sorted = scoredSchemes
+            .filter(s => s.score > 0.35)
+            .sort((a, b) => b.score - a.score);
+
+          if (sorted.length > 0) {
+            return res.json(sorted);
+          }
+        } catch (embedError) {
+          console.error("Embedding-based search failed, falling back to keyword search:", embedError.message);
+        }
+      }
+
+      // Keyword fallback logic
+      const keywords = String(search)
+        .split(/\s+/)
+        .map(w => w.replace(/[^a-zA-Z0-9\u0900-\u097F]/g, ''))
+        .filter(w => w.length > 2);
+
+      let finalResults = [];
+      if (keywords.length > 0) {
+        const regexes = keywords.map(kw => new RegExp(kw, 'i'));
+        finalResults = schemes.filter(scheme => {
+          const textToMatch = `${scheme.name} ${scheme.nameHindi} ${scheme.description} ${scheme.descriptionHindi} ${scheme.category ? scheme.category.join(' ') : ''} ${scheme.targetGroups ? scheme.targetGroups.join(' ') : ''}`.toLowerCase();
+          return regexes.some(rx => rx.test(textToMatch));
+        });
+      } else {
+        const searchRegex = new RegExp(String(search), 'i');
+        finalResults = schemes.filter(scheme => {
+          const textToMatch = `${scheme.name} ${scheme.nameHindi} ${scheme.description} ${scheme.descriptionHindi}`.toLowerCase();
+          return searchRegex.test(textToMatch);
+        });
+      }
+      return res.json(finalResults);
+    }
+
     res.json(schemes);
   } catch (error) {
     console.error("Error retrieving schemes:", error);

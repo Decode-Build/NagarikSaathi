@@ -8,9 +8,10 @@ declare global {
   }
 }
 
-export const useSpeechRecognition = () => {
+export const useSpeechRecognition = (lang: 'en' | 'hi' = 'en') => {
   const [text, setText] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [recognition, setRecognition] = useState<any>(null);
 
   useEffect(() => {
@@ -20,7 +21,7 @@ export const useSpeechRecognition = () => {
         const recognitionInstance = new SpeechRecognition();
         recognitionInstance.continuous = false;
         recognitionInstance.interimResults = true;
-        recognitionInstance.lang = 'en-IN'; // Default to Indian English, can be made dynamic
+        recognitionInstance.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
 
         recognitionInstance.onresult = (event: any) => {
           let currentTranscript = '';
@@ -35,7 +36,9 @@ export const useSpeechRecognition = () => {
         };
 
         recognitionInstance.onerror = (event: any) => {
-          console.error('Speech recognition error', event.error);
+          // Log as warning rather than error so Next.js doesn't show full-screen overlays in dev mode
+          console.warn('Speech recognition error:', event.error);
+          setError(event.error);
           setIsListening(false);
         };
 
@@ -46,20 +49,34 @@ export const useSpeechRecognition = () => {
     }
   }, []);
 
+  // Update language dynamically when lang changes
+  useEffect(() => {
+    if (recognition) {
+      recognition.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
+    }
+  }, [lang, recognition]);
+
   const startListening = useCallback(() => {
     if (recognition && !isListening) {
       try {
+        setError(null);
+        setText(''); // Reset text state when starting new mic capture
         recognition.start();
         setIsListening(true);
       } catch (e) {
-        console.error('Failed to start speech recognition', e);
+        console.warn('Failed to start speech recognition:', e);
+        setError('failed-to-start');
       }
     }
   }, [recognition, isListening]);
 
   const stopListening = useCallback(() => {
     if (recognition && isListening) {
-      recognition.stop();
+      try {
+        recognition.stop();
+      } catch (e) {
+        console.warn('Failed to stop speech recognition:', e);
+      }
       setIsListening(false);
     }
   }, [recognition, isListening]);
@@ -68,6 +85,7 @@ export const useSpeechRecognition = () => {
     text,
     setText,
     isListening,
+    error,
     startListening,
     stopListening,
     hasSupport: !!recognition

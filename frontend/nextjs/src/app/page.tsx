@@ -4,7 +4,7 @@ import SearchBox from '@/components/SearchBox';
 import EligibilityChecker, { EligibilityData } from '@/components/EligibilityChecker';
 import SchemeCard from '@/components/SchemeCard';
 import PrintableHandout from '@/components/PrintableHandout';
-import AiChatDrawer from '@/components/AiChatDrawer';
+import EmbeddedAiChat from '@/components/EmbeddedAiChat';
 import { mockSchemes, Scheme } from '@/data/schemes';
 import { Languages, Info, Sparkles, Filter } from 'lucide-react';
 
@@ -39,7 +39,7 @@ const translations = {
     tabEligibility: "पात्रता जांचकर्ता",
     searchPlaceholder: "योजनाओं के लिए पूछें (जैसे: मैं एक किसान हूँ, मुझे लोन चाहिए...)",
     finding: "आपके लिए सर्वोत्तम योजनाएं खोजी जा रही हैं...",
-    recommended: "अनुशंसित सरकारी योजनाएं",
+    recommended: "आधिकारिक सरकारी योजनाएं",
     recommendedSub: "आपकी खोज और पात्रता विवरण के आधार पर शीर्ष कल्याणकारी योजनाएं।",
     resultsFound: "योजनाएं मिलीं",
     noSchemes: "अभी तक कोई योजना नहीं मिली",
@@ -105,6 +105,7 @@ export default function Home() {
   const [printScheme, setPrintScheme] = useState<Scheme | null>(null);
   const [isOnline, setIsOnline] = useState(true);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [currentSearchQuery, setCurrentSearchQuery] = useState<string>('');
 
   const t = translations[lang];
 
@@ -168,6 +169,7 @@ export default function Home() {
 
   const handleCategorySelect = async (categoryId: string) => {
     setSelectedCategory(categoryId);
+    setCurrentSearchQuery(''); // Reset active AI search conversation
     setIsSearching(true);
     if (categoryId === 'All') {
       await fetchInitial();
@@ -199,28 +201,20 @@ export default function Home() {
   };
 
   const handleSearch = async (query: string) => {
-    setIsSearching(true);
-    try {
-      const res = await fetch(`${API_URL}/schemes?search=${encodeURIComponent(query)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setResults(data.map(item => mapBackendSchemeToFrontend(item, lang)));
-          setIsSearching(false);
-          return;
-        }
-      }
-    } catch (err) {
-      console.warn("Backend search unreachable, falling back to local schemes:", err);
+    setCurrentSearchQuery(query);
+  };
+
+  const handleSchemesFound = (sources: any[]) => {
+    if (sources && sources.length > 0) {
+      setResults(sources.map(item => mapBackendSchemeToFrontend(item, lang)));
+    } else {
+      setResults([]);
     }
-    setTimeout(() => {
-      const filtered = mockSchemes.filter(s => 
-        s.name.toLowerCase().includes(query.toLowerCase()) || 
-        s.overview.toLowerCase().includes(query.toLowerCase())
-      );
-      setResults(filtered.length > 0 ? filtered : mockSchemes);
-      setIsSearching(false);
-    }, 500);
+  };
+
+  const handleChatClear = () => {
+    setCurrentSearchQuery('');
+    fetchInitial();
   };
 
   const handleEligibilityCheck = async (data: EligibilityData) => {
@@ -387,8 +381,16 @@ export default function Home() {
             {/* Input Area */}
             <div className="transition-all duration-500 ease-in-out pb-4">
               {activeTab === 'search' ? (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
                   <SearchBox onSearch={handleSearch} placeholder={t.searchPlaceholder} language={lang} />
+                  
+                  {/* Unified AI Search & Chat interface */}
+                  <EmbeddedAiChat 
+                    lang={lang} 
+                    initialQuery={currentSearchQuery} 
+                    onSchemesFound={handleSchemesFound}
+                    onClear={handleChatClear}
+                  />
                 </div>
               ) : (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 text-left max-w-4xl mx-auto shadow-2xl rounded-3xl overflow-hidden border-4 border-white/20 bg-white/95 backdrop-blur-sm">
@@ -474,8 +476,7 @@ export default function Home() {
           )}
         </section>
         
-        {/* Floating Gemini RAG AI Chat Drawer */}
-        <AiChatDrawer lang={lang} />
+        {/* Floating AI Chat Drawer has been unified inline into the main search workspace */}
 
         {/* Global Footer */}
         <footer className="bg-gray-900 text-gray-400 py-8 text-center mt-auto border-t border-gray-800">
