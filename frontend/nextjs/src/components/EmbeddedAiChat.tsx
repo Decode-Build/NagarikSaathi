@@ -134,16 +134,17 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
 
   if (messages.length === 0) {
     return (
-      <div className="text-center py-6">
-        <p className="text-orange-200 text-sm font-semibold mb-4">
-          {lang === 'hi' ? 'त्वरित प्रश्न चुनें या ऊपर खोजें:' : 'Choose a quick prompt or type above:'}
+      <div className="text-center py-8">
+        <p className="text-orange-100 text-sm font-bold mb-4.5 opacity-90 flex items-center justify-center gap-1.5">
+          <Sparkles size={14} className="text-amber-300 animate-pulse" />
+          {lang === 'hi' ? 'त्वरित प्रश्न चुनें या ऊपर खोजें:' : 'Select a quick query or search above:'}
         </p>
-        <div className="flex flex-wrap justify-center gap-3 max-w-2xl mx-auto">
+        <div className="flex flex-wrap justify-center gap-3.5 max-w-3xl mx-auto px-4">
           {quickPrompts.map((chip, idx) => (
             <button
               key={idx}
               onClick={() => handleSend(chip)}
-              className="text-xs md:text-sm bg-white/10 hover:bg-white/20 text-white border border-white/25 px-4.5 py-2.5 rounded-full font-bold shadow-md hover:scale-105 transition-all duration-300 backdrop-blur-sm"
+              className="text-xs md:text-[13px] bg-white/10 hover:bg-white/20 text-white border border-white/20 px-5 py-2.5 rounded-full font-bold shadow-md hover:scale-105 hover:border-white/30 transition-all duration-300 backdrop-blur-md cursor-pointer"
             >
               {chip}
             </button>
@@ -154,96 +155,112 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
   }
 
   return (
-    <div className="max-w-4xl mx-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-orange-100 overflow-hidden mt-6 animate-in fade-in slide-in-from-bottom-6 duration-500">
+    <div className="max-w-4xl mx-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border border-orange-100/60 overflow-hidden mt-8 animate-in fade-in slide-in-from-bottom-6 duration-500">
       {/* Chat Header */}
-      <div className="bg-gradient-to-r from-orange-600 via-red-600 to-amber-600 p-4 text-white flex justify-between items-center shadow-md">
+      <div className="bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 p-4.5 text-white flex justify-between items-center shadow-md">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center border border-white/30">
-            <Bot size={22} className="text-white" />
+          <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+            <Bot size={20} className="text-white" />
           </div>
           <div>
-            <h4 className="font-extrabold text-sm md:text-base flex items-center gap-2">
+            <h4 className="font-black text-sm md:text-base flex items-center gap-2">
               {lang === 'hi' ? 'नागरिक साथी AI सहायक' : 'NagarikSaathi AI Assistant'}
-              <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Gemini 3.5</span>
+              <span className="flex items-center gap-1 text-[9px] bg-green-500/90 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                </span>
+                Gemini 3.5
+              </span>
             </h4>
-            <p className="text-xs text-orange-100">
-              {lang === 'hi' ? 'योजना और पात्रता स्पष्टीकरण' : 'Welfare scheme matches explained in real time'}
+            <p className="text-xs text-orange-100 font-medium">
+              {lang === 'hi' ? 'योजना और पात्रता स्पष्टीकरण' : 'Real-time welfare scheme guidance & matches'}
             </p>
           </div>
         </div>
         <button 
           onClick={handleClear}
-          className="p-2.5 bg-white/10 hover:bg-white/25 rounded-full text-white transition-all hover:scale-105"
+          className="p-2.5 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all hover:scale-105 cursor-pointer"
           title="Clear Chat / Reset Search"
         >
-          <Trash2 size={18} />
+          <Trash2 size={16} />
         </button>
       </div>
 
       {/* Messages Body */}
-      <div className="h-[320px] overflow-y-auto p-4 md:p-6 space-y-4 bg-orange-50/15">
+      <div className="h-[320px] overflow-y-auto p-4 md:p-6 space-y-4 bg-orange-50/10">
         {messages.map((m) => (
           <div
             key={m.id}
-            className={`flex gap-3.5 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex gap-3 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {m.sender === 'ai' && (
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 via-red-500 to-amber-500 text-white flex items-center justify-center shrink-0 mt-1 shadow-md border border-orange-200">
-                <Bot size={18} />
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 via-red-500 to-amber-500 text-white flex items-center justify-center shrink-0 mt-1 shadow-md border border-orange-100">
+                <Bot size={16} />
               </div>
             )}
-            <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4.5 py-3.5 text-sm md:text-base shadow-sm leading-relaxed ${
+            <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4.5 py-3.5 text-sm md:text-[15px] shadow-sm leading-relaxed ${
               m.sender === 'user'
-                ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-br-none font-semibold'
-                : 'bg-white text-gray-800 border border-orange-50 rounded-bl-none font-medium'
+                ? 'bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-750 text-white rounded-br-none font-semibold'
+                : 'bg-white text-gray-800 border border-slate-100 rounded-bl-none font-medium'
             }`}>
               <p className="whitespace-pre-wrap">{m.text}</p>
               
               {m.sourceSchemes && m.sourceSchemes.length > 0 && (
-                <div className="mt-3.5 pt-3.5 border-t border-orange-100/60 flex flex-wrap gap-2 items-center">
-                  <span className="text-[11px] md:text-xs font-black text-orange-600">
+                <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap gap-2 items-center">
+                  <span className="text-[11px] font-bold text-orange-600">
                     {lang === 'hi' ? 'संबंधित योजनाएं:' : 'Cited Schemes:'}
                   </span>
                   {m.sourceSchemes.map(sid => (
-                    <span key={sid} className="text-[11px] md:text-xs bg-orange-50 text-orange-800 border border-orange-100 px-2.5 py-0.5 rounded font-mono font-bold">
+                    <span key={sid} className="text-[11px] bg-orange-50 text-orange-800 border border-orange-100/60 px-2 py-0.5 rounded-lg font-mono font-bold hover:bg-orange-100 transition-colors cursor-default">
                       {sid}
                     </span>
                   ))}
                 </div>
               )}
 
-              <div className="flex justify-between items-center mt-2.5 text-[10px] md:text-xs text-gray-400">
+              <div className="flex justify-between items-center mt-3 text-[10px] md:text-xs text-gray-400">
                 <span>{m.timestamp}</span>
                 {m.sender === 'ai' && (
                   <button
                     onClick={() => isPlaying ? stopTts() : speak(m.text, lang)}
-                    className="text-orange-600 hover:text-orange-800 flex items-center gap-1.5 font-bold transition-colors"
+                    className="text-orange-600 hover:text-orange-800 flex items-center gap-1.5 font-bold transition-colors cursor-pointer"
                   >
-                    <Volume2 size={14} className={isPlaying ? "animate-pulse" : ""} />
+                    {isPlaying ? (
+                      <div className="flex gap-0.5 items-center mr-0.5">
+                        <span className="w-0.5 h-2.5 bg-orange-600 rounded-full animate-wave" style={{ animationDelay: '0.1s' }} />
+                        <span className="w-0.5 h-3 bg-orange-600 rounded-full animate-wave" style={{ animationDelay: '0.3s' }} />
+                        <span className="w-0.5 h-2 bg-orange-600 rounded-full animate-wave" style={{ animationDelay: '0.2s' }} />
+                      </div>
+                    ) : (
+                      <Volume2 size={13} className="stroke-[2.5]" />
+                    )}
                     {lang === 'hi' ? 'सुनें' : 'Listen'}
                   </button>
                 )}
               </div>
             </div>
             {m.sender === 'user' && (
-              <div className="w-9 h-9 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center shrink-0 mt-1 font-bold border border-orange-200">
-                <User size={18} />
+              <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 mt-1 font-bold border border-indigo-100">
+                <User size={16} />
               </div>
             )}
           </div>
         ))}
 
         {isLoading && (
-          <div className="flex gap-3.5 justify-start animate-pulse">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 via-red-500 to-amber-500 text-white flex items-center justify-center shrink-0 mt-1 border border-orange-200">
-              <Bot size={18} />
+          <div className="flex gap-3 justify-start animate-pulse">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 via-red-500 to-amber-500 text-white flex items-center justify-center shrink-0 mt-1 border border-orange-100">
+              <Bot size={16} />
             </div>
-            <div className="bg-white text-gray-600 border border-orange-50 rounded-2xl rounded-bl-none px-4.5 py-3.5 text-sm md:text-base shadow-sm flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce"></span>
-              <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-              <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-              <span className="text-xs text-gray-400 ml-1 font-semibold">
-                {lang === 'hi' ? 'AI उत्तर तैयार कर रहा है...' : 'Gemini AI reasoning...'}
+            <div className="bg-white text-gray-600 border border-slate-100 rounded-2xl rounded-bl-none px-4.5 py-3.5 text-sm md:text-[15px] shadow-sm flex items-center gap-2">
+              <div className="flex gap-1 mr-1">
+                <span className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></span>
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+              </div>
+              <span className="text-xs text-gray-400 font-bold">
+                {lang === 'hi' ? 'उत्तर तैयार हो रहा है...' : 'Gemini reasoning...'}
               </span>
             </div>
           </div>
@@ -253,12 +270,12 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
       </div>
 
       {/* Quick Suggestion Chips */}
-      <div className="px-4 py-2.5 bg-white border-t border-orange-50/50 overflow-x-auto flex gap-2 no-scrollbar">
+      <div className="px-4 py-3 bg-white border-t border-slate-100 overflow-x-auto flex gap-2 no-scrollbar">
         {quickPrompts.map((chip, idx) => (
           <button
             key={idx}
             onClick={() => handleSend(chip)}
-            className="text-xs whitespace-nowrap bg-orange-50/60 hover:bg-orange-100 text-orange-800 border border-orange-100 px-3 py-1.5 rounded-full font-bold transition-all hover:scale-105 shrink-0"
+            className="text-xs whitespace-nowrap bg-orange-50/50 hover:bg-orange-100/80 text-orange-950 border border-orange-100/50 px-3.5 py-1.5 rounded-full font-bold transition-all hover:scale-102 shrink-0 cursor-pointer"
           >
             {chip}
           </button>
@@ -266,37 +283,37 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
       </div>
 
       {/* Input Bar */}
-      <div className="p-4 bg-white border-t border-gray-100">
+      <div className="p-4 bg-white border-t border-slate-100">
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-          className="flex items-center gap-2 bg-orange-50/40 rounded-full px-4 py-2 border border-orange-100 focus-within:border-orange-500 focus-within:bg-white transition-all shadow-inner"
+          className="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-orange-500 focus-within:bg-white transition-all shadow-inner rounded-2xl px-4 py-2"
         >
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={lang === 'hi' ? 'योजना के बारे में और पूछें...' : 'Ask follow-up questions about these schemes...'}
-            className="flex-1 bg-transparent px-2 py-2 text-sm md:text-base outline-none text-gray-800 placeholder:text-gray-400 font-medium"
+            className="flex-1 bg-transparent px-2 py-2 text-sm md:text-base outline-none text-gray-800 placeholder:text-gray-400 font-semibold"
           />
           {hasSpeechSupport && (
             <button
               type="button"
               onClick={isListening ? stopListening : startListening}
-              className={`p-2.5 rounded-full transition-colors ${
-                isListening ? 'bg-red-500 text-white animate-pulse' : 'text-orange-500 hover:bg-orange-100'
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
+                isListening ? 'bg-red-500 text-white animate-pulse-glow' : 'text-orange-500 hover:bg-orange-50'
               }`}
               title="Voice Query"
             >
-              {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
             </button>
           )}
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="p-3 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 text-white rounded-full hover:scale-105 transition-all disabled:opacity-40 shadow-md"
+            className="p-3 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 text-white rounded-full hover:scale-105 transition-all disabled:opacity-40 shadow-md cursor-pointer flex items-center justify-center"
             title="Send"
           >
-            <Send size={18} />
+            <Send size={16} className="ml-0.5" />
           </button>
         </form>
       </div>
