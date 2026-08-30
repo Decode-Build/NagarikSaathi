@@ -45,9 +45,42 @@ export default function EligibilityChecker({ onCheck }: EligibilityCheckerProps)
           <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
           <select name="state" value={formData.state} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-black">
             <option value="">Select State</option>
-            <option value="madhya-pradesh">Madhya Pradesh</option>
-            <option value="uttar-pradesh">Uttar Pradesh</option>
-            <option value="maharashtra">Maharashtra</option>
+            <option value="Andhra Pradesh">Andhra Pradesh</option>
+            <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+            <option value="Assam">Assam</option>
+            <option value="Bihar">Bihar</option>
+            <option value="Chhattisgarh">Chhattisgarh</option>
+            <option value="Goa">Goa</option>
+            <option value="Gujarat">Gujarat</option>
+            <option value="Haryana">Haryana</option>
+            <option value="Himachal Pradesh">Himachal Pradesh</option>
+            <option value="Jharkhand">Jharkhand</option>
+            <option value="Karnataka">Karnataka</option>
+            <option value="Kerala">Kerala</option>
+            <option value="Madhya Pradesh">Madhya Pradesh</option>
+            <option value="Maharashtra">Maharashtra</option>
+            <option value="Manipur">Manipur</option>
+            <option value="Meghalaya">Meghalaya</option>
+            <option value="Mizoram">Mizoram</option>
+            <option value="Nagaland">Nagaland</option>
+            <option value="Odisha">Odisha</option>
+            <option value="Punjab">Punjab</option>
+            <option value="Rajasthan">Rajasthan</option>
+            <option value="Sikkim">Sikkim</option>
+            <option value="Tamil Nadu">Tamil Nadu</option>
+            <option value="Telangana">Telangana</option>
+            <option value="Tripura">Tripura</option>
+            <option value="Uttarakhand">Uttarakhand</option>
+            <option value="Uttar Pradesh">Uttar Pradesh</option>
+            <option value="West Bengal">West Bengal</option>
+            <option value="Andaman and Nicobar Islands">Andaman & Nicobar Islands</option>
+            <option value="Chandigarh">Chandigarh</option>
+            <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra & Nagar Haveli and Daman & Diu</option>
+            <option value="Delhi">Delhi</option>
+            <option value="Jammu and Kashmir">Jammu & Kashmir</option>
+            <option value="Ladakh">Ladakh</option>
+            <option value="Lakshadweep">Lakshadweep</option>
+            <option value="Puducherry">Puducherry</option>
           </select>
         </div>
         
@@ -55,10 +88,12 @@ export default function EligibilityChecker({ onCheck }: EligibilityCheckerProps)
           <label className="block text-sm font-medium text-gray-700 mb-1">Occupation</label>
           <select name="occupation" value={formData.occupation} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-black">
             <option value="">Select Occupation</option>
-            <option value="farmer">Farmer</option>
-            <option value="student">Student</option>
-            <option value="unemployed">Unemployed</option>
-            <option value="business">Business</option>
+            <option value="Farmer">Farmer</option>
+            <option value="Student">Student</option>
+            <option value="Labourer">Labourer / Worker</option>
+            <option value="Artisan">Artisan / Self-Employed</option>
+            <option value="Business Owner">Business Owner / MSME</option>
+            <option value="Unemployed">Unemployed</option>
           </select>
         </div>
 
@@ -66,9 +101,9 @@ export default function EligibilityChecker({ onCheck }: EligibilityCheckerProps)
           <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
           <select name="gender" value={formData.gender} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-black">
             <option value="">Select Gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="transgender">Transgender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="All">All / Other</option>
           </select>
         </div>
 
@@ -76,9 +111,10 @@ export default function EligibilityChecker({ onCheck }: EligibilityCheckerProps)
           <label className="block text-sm font-medium text-gray-700 mb-1">Marital Status</label>
           <select name="maritalStatus" value={formData.maritalStatus} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-black">
             <option value="">Select Status</option>
-            <option value="single">Single</option>
-            <option value="married">Married</option>
-            <option value="widowed">Widowed</option>
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+            <option value="Widowed">Widowed</option>
+            <option value="All">All / Other</option>
           </select>
         </div>
 
@@ -86,10 +122,10 @@ export default function EligibilityChecker({ onCheck }: EligibilityCheckerProps)
           <label className="block text-sm font-medium text-gray-700 mb-1">Land Ownership</label>
           <select name="land" value={formData.land} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-black">
             <option value="">Select Land Type</option>
-            <option value="none">Landless</option>
-            <option value="marginal">Marginal (Up to 1 Hectare)</option>
-            <option value="small">Small (1-2 Hectares)</option>
-            <option value="large">Large (More than 2 Hectares)</option>
+            <option value="0">Landless (0 Acres)</option>
+            <option value="2">Marginal (Up to 2.5 Acres)</option>
+            <option value="5">Small (2.5 to 5 Acres)</option>
+            <option value="10">Large (More than 5 Acres)</option>
           </select>
         </div>
 
@@ -97,10 +133,10 @@ export default function EligibilityChecker({ onCheck }: EligibilityCheckerProps)
           <label className="block text-sm font-medium text-gray-700 mb-1">Annual Income (₹)</label>
           <select name="income" value={formData.income} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-black">
             <option value="">Select Income Range</option>
-            <option value="<50000">Below 50,000</option>
-            <option value="50000-100000">50,000 - 1,00,000</option>
-            <option value="100000-250000">1,00,000 - 2,50,000</option>
-            <option value=">250000">Above 2,50,000</option>
+            <option value="45000">Below 50,000</option>
+            <option value="90000">50,000 - 1,00,000</option>
+            <option value="200000">1,00,000 - 2,50,000</option>
+            <option value="500000">Above 2,50,000</option>
           </select>
         </div>
 
@@ -108,10 +144,10 @@ export default function EligibilityChecker({ onCheck }: EligibilityCheckerProps)
           <label className="block text-sm font-medium text-gray-700 mb-1">Caste Category</label>
           <select name="caste" value={formData.caste} onChange={handleChange} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-black">
             <option value="">Select Category</option>
-            <option value="general">General</option>
-            <option value="obc">OBC</option>
-            <option value="sc">SC</option>
-            <option value="st">ST</option>
+            <option value="General">General</option>
+            <option value="OBC">OBC</option>
+            <option value="SC">SC</option>
+            <option value="ST">ST</option>
           </select>
         </div>
         

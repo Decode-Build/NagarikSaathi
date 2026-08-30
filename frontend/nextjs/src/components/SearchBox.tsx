@@ -6,11 +6,11 @@ import { Mic, MicOff, Search, Send } from 'lucide-react';
 interface SearchBoxProps {
   onSearch: (query: string) => void;
   placeholder?: string;
-  language?: string;
+  language?: 'en' | 'hi';
 }
 
-export default function SearchBox({ onSearch, placeholder = "Ask for schemes (e.g. I am a farmer...)", language = 'en-IN' }: SearchBoxProps) {
-  const { text, isListening, startListening, stopListening, hasSupport } = useSpeechRecognition();
+export default function SearchBox({ onSearch, placeholder = "Ask for schemes (e.g. I am a farmer...)", language = 'en' }: SearchBoxProps) {
+  const { text, isListening, startListening, stopListening, hasSupport } = useSpeechRecognition(language);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
