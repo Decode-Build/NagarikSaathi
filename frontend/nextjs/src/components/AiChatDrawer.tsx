@@ -1,13 +1,17 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Sparkles, User, Mic, MicOff, Volume2, ArrowRight } from 'lucide-react';
+import { Bot, X, Send, Sparkles, User, Mic, MicOff, Volume2, VolumeX, ArrowLeftRight, Loader2, Languages } from 'lucide-react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useTextToSpeech } from '../hooks/useTextToSpeech';
+import { convertTextLanguage } from '../utils/translator';
 
 interface Message {
   id: string;
   sender: 'user' | 'ai';
   text: string;
+  translatedText?: string;
+  showingTranslation?: boolean;
+  isTranslating?: boolean;
   sourceSchemes?: string[];
   timestamp: string;
 }
@@ -15,6 +19,8 @@ interface Message {
 interface AiChatDrawerProps {
   lang: 'en' | 'hi';
 }
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function AiChatDrawer({ lang }: AiChatDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -30,10 +36,21 @@ export default function AiChatDrawer({ lang }: AiChatDrawerProps) {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isConvertingInput, setIsConvertingInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  const { text: speechText, isListening, startListening, stopListening, hasSupport: hasSpeechSupport } = useSpeechRecognition();
-  const { speak, isPlaying, stop: stopTts } = useTextToSpeech();
+  const { 
+    text: speechText, 
+    isListening, 
+    startListening, 
+    stopListening, 
+    hasSupport: hasSpeechSupport,
+    voiceLang,
+    toggleVoiceLang,
+    error: speechError
+  } = useSpeechRecognition(lang);
+
+  const { speak, isPlaying, stop: stopTts, currentText } = useTextToSpeech();
 
   // Populate voice recognition into input
   useEffect(() => {
@@ -59,6 +76,61 @@ export default function AiChatDrawer({ lang }: AiChatDrawerProps) {
     '💼 Collateral-free business loans'
   ];
 
+  const handleConvertInput = async () => {
+    if (!input.trim() || isConvertingInput) return;
+    setIsConvertingInput(true);
+    try {
+      const isHindi = Boolean(input.match(/[\u0900-\u097F]/));
+      const targetLang = isHindi ? 'en' : 'hi';
+      const result = await convertTextLanguage(input, targetLang);
+      if (result.translatedText) {
+        setInput(result.translatedText);
+      }
+    } catch (err) {
+      console.warn("Input translation error:", err);
+    } finally {
+      setIsConvertingInput(false);
+    }
+  };
+
+  const handleToggleMessageTranslation = async (msgId: string) => {
+    const targetMsg = messages.find(m => m.id === msgId);
+    if (!targetMsg) return;
+
+    if (targetMsg.translatedText) {
+      setMessages(prev => prev.map(m => 
+        m.id === msgId ? { ...m, showingTranslation: !m.showingTranslation } : m
+      ));
+      return;
+    }
+
+    setMessages(prev => prev.map(m => 
+      m.id === msgId ? { ...m, isTranslating: true } : m
+    ));
+
+    try {
+      const isHindi = Boolean(targetMsg.text.match(/[\u0900-\u097F]/));
+      const targetLang = isHindi ? 'en' : 'hi';
+      const result = await convertTextLanguage(targetMsg.text, targetLang);
+
+      setMessages(prev => prev.map(m => 
+        m.id === msgId 
+          ? { 
+              ...m, 
+              translatedText: result.translatedText, 
+              showingTranslation: true, 
+              isTranslating: false 
+            } 
+          : m
+      ));
+    } catch (err) {
+      console.warn("Message translation error:", err);
+      setMessages(prev => prev.map(m => 
+        m.id === msgId ? { ...m, isTranslating: false } : m
+      ));
+    }
+  };
+
   const handleSend = async (textToSend?: string) => {
     const query = textToSend || input;
     if (!query.trim() || isLoading) return;
@@ -75,13 +147,14 @@ export default function AiChatDrawer({ lang }: AiChatDrawerProps) {
     setIsLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/chat', {
+      const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: query,
           sessionId: `nextjs-session-${Date.now()}`,
-          sessionType: 'self'
+          sessionType: 'self',
+          preferredLang: lang
         })
       });
 
@@ -99,7 +172,6 @@ export default function AiChatDrawer({ lang }: AiChatDrawerProps) {
         throw new Error('API request failed');
       }
     } catch {
-      // Graceful local fallback if backend offline
       const fallbackAiMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
@@ -153,10 +225,10 @@ export default function AiChatDrawer({ lang }: AiChatDrawerProps) {
             <div>
               <h3 className="font-bold text-base flex items-center gap-2">
                 {lang === 'hi' ? 'नागरिक साथी AI' : 'NagarikSaathi AI'}
-                <span className="text-[10px] bg-green-500/80 text-white px-2 py-0.5 rounded-full font-medium">Gemini 3.5</span>
+                <span className="text-[10px] bg-green-500/80 text-white px-2 py-0.5 rounded-full font-medium">Bilingual AI</span>
               </h3>
               <p className="text-xs text-orange-100">
-                {lang === 'hi' ? 'योजना और पात्रता सलाहकार' : 'Scheme & Eligibility Advisor'}
+                {lang === 'hi' ? 'योजना एवं पात्रता सलाहकार' : 'Scheme & Eligibility Advisor'}
               </p>
             </div>
           </div>
@@ -170,56 +242,87 @@ export default function AiChatDrawer({ lang }: AiChatDrawerProps) {
 
         {/* Messages Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-orange-50/20">
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex gap-2.5 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {m.sender === 'ai' && (
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-red-600 text-white flex items-center justify-center shrink-0 mt-1 shadow-sm">
-                  <Bot size={15} />
-                </div>
-              )}
-              <div className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                m.sender === 'user'
-                  ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-br-none'
-                  : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
-              }`}>
-                <p className="leading-relaxed whitespace-pre-wrap">{m.text}</p>
-                
-                {m.sourceSchemes && m.sourceSchemes.length > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-gray-100 flex flex-wrap gap-1.5 items-center">
-                    <span className="text-[11px] font-semibold text-orange-600">
-                      {lang === 'hi' ? 'संबंधित योजनाएं:' : 'Cited Schemes:'}
-                    </span>
-                    {m.sourceSchemes.map(sid => (
-                      <span key={sid} className="text-[11px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-mono">
-                        {sid}
-                      </span>
-                    ))}
+          {messages.map((m) => {
+            const displayText = m.showingTranslation && m.translatedText ? m.translatedText : m.text;
+            const isHindiText = Boolean(displayText.match(/[\u0900-\u097F]/));
+            const isCurrentlySpeaking = isPlaying && currentText === displayText;
+
+            return (
+              <div
+                key={m.id}
+                className={`flex gap-2.5 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                {m.sender === 'ai' && (
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-500 to-red-600 text-white flex items-center justify-center shrink-0 mt-1 shadow-sm">
+                    <Bot size={15} />
                   </div>
                 )}
-
-                <div className="flex justify-between items-center mt-1.5 text-[10px] text-gray-400">
-                  <span>{m.timestamp}</span>
-                  {m.sender === 'ai' && (
-                    <button
-                      onClick={() => isPlaying ? stopTts() : speak(m.text, lang)}
-                      className="text-orange-600 hover:text-orange-800 flex items-center gap-1 font-medium transition-colors"
-                    >
-                      <Volume2 size={12} />
-                      {lang === 'hi' ? 'सुनें' : 'Listen'}
-                    </button>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                  m.sender === 'user'
+                    ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-br-none'
+                    : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                }`}>
+                  <p className="leading-relaxed whitespace-pre-wrap">{displayText}</p>
+                  
+                  {m.sourceSchemes && m.sourceSchemes.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-gray-100 flex flex-wrap gap-1.5 items-center">
+                      <span className="text-[11px] font-semibold text-orange-600">
+                        {lang === 'hi' ? 'संबंधित योजनाएं:' : 'Cited Schemes:'}
+                      </span>
+                      {m.sourceSchemes.map(sid => (
+                        <span key={sid} className="text-[11px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-mono">
+                          {sid}
+                        </span>
+                      ))}
+                    </div>
                   )}
+
+                  <div className="flex flex-wrap justify-between items-center gap-2 mt-2 pt-1.5 border-t border-gray-50 text-[10px] text-gray-400">
+                    <span>{m.timestamp}</span>
+                    {m.sender === 'ai' && (
+                      <div className="flex items-center gap-2">
+                        {/* Translate button */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleMessageTranslation(m.id)}
+                          disabled={m.isTranslating}
+                          className="text-orange-700 hover:text-orange-900 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full flex items-center gap-1 font-semibold transition-all disabled:opacity-50"
+                          title="Translate message"
+                        >
+                          {m.isTranslating ? (
+                            <Loader2 size={10} className="animate-spin text-orange-600" />
+                          ) : (
+                            <Languages size={10} className="text-orange-600" />
+                          )}
+                          <span>
+                            {m.showingTranslation 
+                              ? (lang === 'hi' ? 'मूल (Original)' : 'Original')
+                              : (isHindiText ? 'English' : 'हिन्दी')}
+                          </span>
+                        </button>
+
+                        {/* Audio readout */}
+                        <button
+                          onClick={() => isCurrentlySpeaking ? stopTts() : speak(displayText, isHindiText ? 'hi' : 'en')}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full font-medium transition-colors ${
+                            isCurrentlySpeaking ? 'bg-red-500 text-white animate-pulse' : 'text-orange-600 hover:text-orange-800'
+                          }`}
+                        >
+                          {isCurrentlySpeaking ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                          <span>{isCurrentlySpeaking ? (lang === 'hi' ? 'रोकें' : 'Stop') : (lang === 'hi' ? 'सुनें' : 'Listen')}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+                {m.sender === 'user' && (
+                  <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center shrink-0 mt-1">
+                    <User size={15} />
+                  </div>
+                )}
               </div>
-              {m.sender === 'user' && (
-                <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center shrink-0 mt-1">
-                  <User size={15} />
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
 
           {isLoading && (
             <div className="flex gap-2.5 justify-start">
@@ -264,29 +367,61 @@ export default function AiChatDrawer({ lang }: AiChatDrawerProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={lang === 'hi' ? 'योजना के बारे में पूछें...' : 'Ask about government schemes...'}
-              className="flex-1 bg-transparent px-2 py-1.5 text-sm outline-none text-gray-800 placeholder:text-gray-400"
+              className="flex-1 bg-transparent px-2 py-1.5 text-sm outline-none text-gray-800 placeholder:text-gray-400 min-w-0"
             />
-            {hasSpeechSupport && (
+
+            {input.trim().length > 0 && (
               <button
                 type="button"
-                onClick={isListening ? stopListening : startListening}
-                className={`p-2 rounded-full transition-colors ${
-                  isListening ? 'bg-red-500 text-white animate-pulse' : 'text-gray-500 hover:text-orange-600'
-                }`}
-                title="Voice Query"
+                onClick={handleConvertInput}
+                disabled={isConvertingInput}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[11px] font-bold shrink-0"
+                title="Convert English / Hindi"
               >
-                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                {isConvertingInput ? <Loader2 size={10} className="animate-spin" /> : <ArrowLeftRight size={10} />}
+                <span>{input.match(/[\u0900-\u097F]/) ? 'EN' : 'हिन्दी'}</span>
               </button>
             )}
+
+            {hasSpeechSupport && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={toggleVoiceLang}
+                  className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300"
+                  title="Toggle voice language"
+                >
+                  {voiceLang === 'hi' ? 'HI' : 'EN'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={isListening ? stopListening : startListening}
+                  className={`p-2 rounded-full transition-colors ${
+                    isListening ? 'bg-red-500 text-white animate-pulse' : 'text-gray-500 hover:text-orange-600'
+                  }`}
+                  title="Voice Query"
+                >
+                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={!input.trim() || isLoading}
-              className="p-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-full hover:from-orange-700 hover:to-red-700 transition-all disabled:opacity-40 shadow-sm"
+              className="p-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-full hover:from-orange-700 hover:to-red-700 transition-all disabled:opacity-40 shadow-sm shrink-0"
               title="Send"
             >
               <Send size={16} />
             </button>
           </form>
+
+          {isListening && (
+            <div className="mt-1 text-center text-[11px] font-semibold text-red-500 animate-pulse">
+              {voiceLang === 'hi' ? '🎙️ हिन्दी में बोलें...' : '🎙️ Speak in English...'}
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -1,13 +1,17 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Send, Sparkles, User, Mic, MicOff, Volume2, Trash2 } from 'lucide-react';
+import { Bot, Send, Sparkles, User, Mic, MicOff, Volume2, VolumeX, Trash2, ArrowLeftRight, Loader2, Languages } from 'lucide-react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useTextToSpeech } from '../hooks/useTextToSpeech';
+import { convertTextLanguage } from '../utils/translator';
 
 interface Message {
   id: string;
   sender: 'user' | 'ai';
   text: string;
+  translatedText?: string;
+  showingTranslation?: boolean;
+  isTranslating?: boolean;
   sourceSchemes?: string[];
   timestamp: string;
 }
@@ -25,10 +29,21 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isConvertingInput, setIsConvertingInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  const { text: speechText, isListening, startListening, stopListening, hasSupport: hasSpeechSupport } = useSpeechRecognition(lang);
-  const { speak, isPlaying, stop: stopTts } = useTextToSpeech();
+  const { 
+    text: speechText, 
+    isListening, 
+    startListening, 
+    stopListening, 
+    hasSupport: hasSpeechSupport,
+    voiceLang,
+    toggleVoiceLang,
+    error: speechError
+  } = useSpeechRecognition(lang);
+
+  const { speak, isPlaying, stop: stopTts, currentText } = useTextToSpeech();
 
   // Populate voice recognition into input
   useEffect(() => {
@@ -61,6 +76,65 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
     '💼 Collateral-free business loans'
   ];
 
+  // Convert/Translate user input between English & Hindi
+  const handleConvertInput = async () => {
+    if (!input.trim() || isConvertingInput) return;
+    setIsConvertingInput(true);
+    try {
+      const isHindi = Boolean(input.match(/[\u0900-\u097F]/));
+      const targetLang = isHindi ? 'en' : 'hi';
+      const result = await convertTextLanguage(input, targetLang);
+      if (result.translatedText) {
+        setInput(result.translatedText);
+      }
+    } catch (err) {
+      console.warn("Error converting chat input:", err);
+    } finally {
+      setIsConvertingInput(false);
+    }
+  };
+
+  // Convert/Translate an AI response message between English and Hindi
+  const handleToggleMessageTranslation = async (msgId: string) => {
+    const targetMsg = messages.find(m => m.id === msgId);
+    if (!targetMsg) return;
+
+    // If already translated and cached, toggle display
+    if (targetMsg.translatedText) {
+      setMessages(prev => prev.map(m => 
+        m.id === msgId ? { ...m, showingTranslation: !m.showingTranslation } : m
+      ));
+      return;
+    }
+
+    // Otherwise fetch translation
+    setMessages(prev => prev.map(m => 
+      m.id === msgId ? { ...m, isTranslating: true } : m
+    ));
+
+    try {
+      const isHindi = Boolean(targetMsg.text.match(/[\u0900-\u097F]/));
+      const targetLang = isHindi ? 'en' : 'hi';
+      const result = await convertTextLanguage(targetMsg.text, targetLang);
+
+      setMessages(prev => prev.map(m => 
+        m.id === msgId 
+          ? { 
+              ...m, 
+              translatedText: result.translatedText, 
+              showingTranslation: true, 
+              isTranslating: false 
+            } 
+          : m
+      ));
+    } catch (err) {
+      console.warn("Message translation error:", err);
+      setMessages(prev => prev.map(m => 
+        m.id === msgId ? { ...m, isTranslating: false } : m
+      ));
+    }
+  };
+
   const handleSend = async (textToSend?: string) => {
     const query = textToSend || input;
     if (!query.trim() || isLoading) return;
@@ -83,7 +157,8 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
         body: JSON.stringify({
           message: query,
           sessionId: `nextjs-session-${Date.now()}`,
-          sessionType: 'self'
+          sessionType: 'self',
+          preferredLang: lang
         })
       });
 
@@ -164,10 +239,10 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
           <div>
             <h4 className="font-extrabold text-sm md:text-base flex items-center gap-2">
               {lang === 'hi' ? 'नागरिक साथी AI सहायक' : 'NagarikSaathi AI Assistant'}
-              <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Gemini 3.5</span>
+              <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Bilingual AI</span>
             </h4>
             <p className="text-xs text-orange-100">
-              {lang === 'hi' ? 'योजना और पात्रता स्पष्टीकरण' : 'Welfare scheme matches explained in real time'}
+              {lang === 'hi' ? 'योजना और पात्रता स्पष्टीकरण (हिन्दी एवं English अनुवाद समर्थित)' : 'Welfare scheme matches explained with real-time English/Hindi conversion'}
             </p>
           </div>
         </div>
@@ -181,57 +256,106 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
       </div>
 
       {/* Messages Body */}
-      <div className="h-[320px] overflow-y-auto p-4 md:p-6 space-y-4 bg-orange-50/15">
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`flex gap-3.5 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            {m.sender === 'ai' && (
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 via-red-500 to-amber-500 text-white flex items-center justify-center shrink-0 mt-1 shadow-md border border-orange-200">
-                <Bot size={18} />
-              </div>
-            )}
-            <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4.5 py-3.5 text-sm md:text-base shadow-sm leading-relaxed ${
-              m.sender === 'user'
-                ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-br-none font-semibold'
-                : 'bg-white text-gray-800 border border-orange-50 rounded-bl-none font-medium'
-            }`}>
-              <p className="whitespace-pre-wrap">{m.text}</p>
-              
-              {m.sourceSchemes && m.sourceSchemes.length > 0 && (
-                <div className="mt-3.5 pt-3.5 border-t border-orange-100/60 flex flex-wrap gap-2 items-center">
-                  <span className="text-[11px] md:text-xs font-black text-orange-600">
-                    {lang === 'hi' ? 'संबंधित योजनाएं:' : 'Cited Schemes:'}
-                  </span>
-                  {m.sourceSchemes.map(sid => (
-                    <span key={sid} className="text-[11px] md:text-xs bg-orange-50 text-orange-800 border border-orange-100 px-2.5 py-0.5 rounded font-mono font-bold">
-                      {sid}
-                    </span>
-                  ))}
+      <div className="h-[340px] overflow-y-auto p-4 md:p-6 space-y-4 bg-orange-50/15">
+        {messages.map((m) => {
+          const displayText = m.showingTranslation && m.translatedText ? m.translatedText : m.text;
+          const isHindiText = Boolean(displayText.match(/[\u0900-\u097F]/));
+          const isCurrentlySpeaking = isPlaying && currentText === displayText;
+
+          return (
+            <div
+              key={m.id}
+              className={`flex gap-3.5 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              {m.sender === 'ai' && (
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 via-red-500 to-amber-500 text-white flex items-center justify-center shrink-0 mt-1 shadow-md border border-orange-200">
+                  <Bot size={18} />
                 </div>
               )}
-
-              <div className="flex justify-between items-center mt-2.5 text-[10px] md:text-xs text-gray-400">
-                <span>{m.timestamp}</span>
-                {m.sender === 'ai' && (
-                  <button
-                    onClick={() => isPlaying ? stopTts() : speak(m.text, lang)}
-                    className="text-orange-600 hover:text-orange-800 flex items-center gap-1.5 font-bold transition-colors"
-                  >
-                    <Volume2 size={14} className={isPlaying ? "animate-pulse" : ""} />
-                    {lang === 'hi' ? 'सुनें' : 'Listen'}
-                  </button>
+              <div className={`max-w-[88%] md:max-w-[80%] rounded-2xl px-4.5 py-3.5 text-sm md:text-base shadow-sm leading-relaxed ${
+                m.sender === 'user'
+                  ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-br-none font-semibold'
+                  : 'bg-white text-gray-800 border border-orange-100 rounded-bl-none font-medium'
+              }`}>
+                {/* Translation Active Badge */}
+                {m.sender === 'ai' && m.showingTranslation && (
+                  <div className="mb-2 inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                    <Sparkles size={11} className="text-amber-600" />
+                    <span>{isHindiText ? 'अनुवादित (Hindi Translation)' : 'Translated to English'}</span>
+                  </div>
                 )}
+
+                <p className="whitespace-pre-wrap">{displayText}</p>
+                
+                {m.sourceSchemes && m.sourceSchemes.length > 0 && (
+                  <div className="mt-3.5 pt-3 border-t border-orange-100/60 flex flex-wrap gap-2 items-center">
+                    <span className="text-[11px] md:text-xs font-black text-orange-600">
+                      {lang === 'hi' ? 'संबंधित योजनाएं:' : 'Cited Schemes:'}
+                    </span>
+                    {m.sourceSchemes.map(sid => (
+                      <span key={sid} className="text-[11px] md:text-xs bg-orange-50 text-orange-800 border border-orange-100 px-2.5 py-0.5 rounded font-mono font-bold">
+                        {sid}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Footer Controls: Audio & Convert */}
+                <div className="flex flex-wrap justify-between items-center gap-2 mt-3 pt-2 border-t border-gray-100 text-[10px] md:text-xs text-gray-400">
+                  <span>{m.timestamp}</span>
+
+                  {m.sender === 'ai' && (
+                    <div className="flex items-center gap-3">
+                      {/* Convert / Translate Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleMessageTranslation(m.id)}
+                        disabled={m.isTranslating}
+                        className="text-orange-700 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-full flex items-center gap-1 font-bold transition-all disabled:opacity-50"
+                        title="Translate message between English and Hindi"
+                      >
+                        {m.isTranslating ? (
+                          <Loader2 size={12} className="animate-spin text-orange-600" />
+                        ) : (
+                          <Languages size={12} className="text-orange-600" />
+                        )}
+                        <span>
+                          {m.showingTranslation 
+                            ? (lang === 'hi' ? 'मूल पाठ (Original)' : 'Original')
+                            : (isHindiText ? 'English में देखें' : 'हिन्दी में देखें')}
+                        </span>
+                      </button>
+
+                      {/* Text-to-Speech Button */}
+                      <button
+                        type="button"
+                        onClick={() => isCurrentlySpeaking ? stopTts() : speak(displayText, isHindiText ? 'hi' : 'en')}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full font-bold transition-all ${
+                          isCurrentlySpeaking
+                            ? 'bg-red-500 text-white animate-pulse shadow-sm'
+                            : 'text-orange-700 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-200'
+                        }`}
+                        title={isCurrentlySpeaking ? "Stop voice" : "Listen in Voice Assistant"}
+                      >
+                        {isCurrentlySpeaking ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                        <span>
+                          {isCurrentlySpeaking 
+                            ? (lang === 'hi' ? 'रोकें' : 'Stop')
+                            : (lang === 'hi' ? 'सुनें' : 'Listen')}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
+              {m.sender === 'user' && (
+                <div className="w-9 h-9 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center shrink-0 mt-1 font-bold border border-orange-200">
+                  <User size={18} />
+                </div>
+              )}
             </div>
-            {m.sender === 'user' && (
-              <div className="w-9 h-9 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center shrink-0 mt-1 font-bold border border-orange-200">
-                <User size={18} />
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
 
         {isLoading && (
           <div className="flex gap-3.5 justify-start animate-pulse">
@@ -253,7 +377,7 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
       </div>
 
       {/* Quick Suggestion Chips */}
-      <div className="px-4 py-2.5 bg-white border-t border-orange-50/50 overflow-x-auto flex gap-2 no-scrollbar">
+      <div className="px-4 py-2 bg-white border-t border-orange-50/50 overflow-x-auto flex gap-2 no-scrollbar">
         {quickPrompts.map((chip, idx) => (
           <button
             key={idx}
@@ -266,39 +390,87 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
       </div>
 
       {/* Input Bar */}
-      <div className="p-4 bg-white border-t border-gray-100">
+      <div className="p-3.5 md:p-4 bg-white border-t border-gray-100">
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-          className="flex items-center gap-2 bg-orange-50/40 rounded-full px-4 py-2 border border-orange-100 focus-within:border-orange-500 focus-within:bg-white transition-all shadow-inner"
+          className="flex items-center gap-2 bg-orange-50/40 rounded-full px-3 md:px-4 py-1.5 md:py-2 border border-orange-200 focus-within:border-orange-500 focus-within:bg-white transition-all shadow-inner"
         >
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={lang === 'hi' ? 'योजना के बारे में और पूछें...' : 'Ask follow-up questions about these schemes...'}
-            className="flex-1 bg-transparent px-2 py-2 text-sm md:text-base outline-none text-gray-800 placeholder:text-gray-400 font-medium"
+            className="flex-1 bg-transparent px-2 py-2 text-sm md:text-base outline-none text-gray-800 placeholder:text-gray-400 font-medium min-w-0"
           />
-          {hasSpeechSupport && (
+
+          {/* Convert Input Text (EN <-> HI) */}
+          {input.trim().length > 0 && (
             <button
               type="button"
-              onClick={isListening ? stopListening : startListening}
-              className={`p-2.5 rounded-full transition-colors ${
-                isListening ? 'bg-red-500 text-white animate-pulse' : 'text-orange-500 hover:bg-orange-100'
-              }`}
-              title="Voice Query"
+              onClick={handleConvertInput}
+              disabled={isConvertingInput}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-100 text-orange-800 border border-orange-200 hover:bg-orange-200 text-xs font-bold shrink-0 transition-all"
+              title="Convert input between English & Hindi"
             >
-              {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+              {isConvertingInput ? (
+                <Loader2 size={12} className="animate-spin text-orange-600" />
+              ) : (
+                <ArrowLeftRight size={12} className="text-orange-600" />
+              )}
+              <span className="hidden sm:inline">
+                {input.match(/[\u0900-\u097F]/) ? 'EN' : 'हिन्दी'}
+              </span>
             </button>
           )}
+
+          {/* Voice Language Toggle & Mic */}
+          {hasSpeechSupport && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={toggleVoiceLang}
+                className="px-2 py-1 rounded-full text-[10px] md:text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition-colors"
+                title={`Voice recognition: ${voiceLang === 'hi' ? 'Hindi (हिन्दी)' : 'English (India)'}. Click to switch.`}
+              >
+                {voiceLang === 'hi' ? '🇮🇳 HI' : '🌐 EN'}
+              </button>
+
+              <button
+                type="button"
+                onClick={isListening ? stopListening : startListening}
+                className={`p-2.5 rounded-full transition-all ${
+                  isListening 
+                    ? 'bg-red-500 text-white animate-pulse ring-2 ring-red-300' 
+                    : 'text-orange-600 hover:bg-orange-100'
+                }`}
+                title={isListening ? "Stop listening" : `Start voice input in ${voiceLang === 'hi' ? 'Hindi' : 'English'}`}
+              >
+                {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="p-3 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 text-white rounded-full hover:scale-105 transition-all disabled:opacity-40 shadow-md"
+            className="p-2.5 md:p-3 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 text-white rounded-full hover:scale-105 transition-all disabled:opacity-40 shadow-md shrink-0"
             title="Send"
           >
             <Send size={18} />
           </button>
         </form>
+
+        {/* Listening Status indicator */}
+        {isListening && (
+          <div className="mt-2 text-center text-xs font-semibold text-red-600 animate-pulse">
+            {voiceLang === 'hi' ? '🎙️ आवाज़ सुन रहा है... (हिन्दी में बोलें)' : '🎙️ Listening... (Speak in English)'}
+          </div>
+        )}
+        {speechError && (
+          <div className="mt-1 text-center text-xs text-amber-700 font-medium">
+            {speechError}
+          </div>
+        )}
       </div>
     </div>
   );

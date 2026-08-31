@@ -302,21 +302,21 @@ export default function Home() {
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-red-600 to-amber-700 tracking-tight flex items-center gap-2">
                   {t.title}
-                  <span className="text-[9px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-bold tracking-normal uppercase shrink-0">
+                  <span className="hidden sm:inline-block text-[9px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-bold tracking-normal uppercase shrink-0">
                     Evaluation Mode
                   </span>
                 </h1>
-                <span className="text-[10px] text-gray-500 font-medium block -mt-1">
+                <span className="hidden sm:block text-[10px] text-gray-500 font-medium -mt-1">
                   {lang === 'hi' ? 'कल्याणकारी योजना सहायता मंच — पूर्व-पायलट मूल्यांकन मोड' : 'Govt Welfare Scheme Portal — Pre-Pilot Architecture / Evaluation Mode'}
                 </span>
               </div>
             </div>
             
             <div className="flex items-center gap-6">
-              <nav className="hidden md:flex gap-6 text-sm font-bold text-gray-700">
+              <nav className="hidden lg:flex gap-6 text-sm font-bold text-gray-700 items-center">
                 <a href="#" className="text-orange-600 border-b-2 border-orange-600 pb-0.5">{t.home}</a>
-                <a href="#schemes-section" className="hover:text-orange-600 transition-colors">{t.allSchemes}</a>
-                <a href="/admin" className="hover:text-orange-600 transition-colors flex items-center gap-1.5 bg-orange-50 text-orange-800 px-3 py-1 rounded-full border border-orange-200">
+                <a href="#schemes-section" className="hover:text-orange-600 transition-colors whitespace-nowrap">{t.allSchemes}</a>
+                <a href="/admin" className="hover:text-orange-600 transition-colors flex items-center gap-1.5 bg-orange-50 text-orange-800 px-3 py-1 rounded-full border border-orange-200 whitespace-nowrap">
                   <Sparkles size={14} className="text-orange-500" />
                   {t.cscLogin}
                 </a>
@@ -324,17 +324,18 @@ export default function Home() {
               
               <button 
                 onClick={toggleLanguage}
-                className="flex items-center gap-2 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-800 hover:from-orange-200 hover:to-amber-200 px-4 py-2 rounded-full font-bold text-xs shadow-sm transition-all border border-orange-200"
+                className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-800 hover:from-orange-200 hover:to-amber-200 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full font-bold text-xs shadow-sm transition-all border border-orange-200"
               >
                 <Languages size={16} />
-                {lang === 'en' ? '🇮🇳 हिंदी में देखें' : '🌐 View in English'}
+                <span className="hidden sm:inline">{lang === 'en' ? '🇮🇳 हिंदी में देखें' : '🌐 View in English'}</span>
+                <span className="sm:hidden">{lang === 'en' ? 'हिंदी' : 'EN'}</span>
               </button>
             </div>
           </div>
         </header>
 
         {/* Hero Banner Section */}
-        <section className="relative overflow-hidden">
+        <section className="relative">
           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1538991383142-36c4edeaffde?q=80&w=2071&auto=format&fit=crop')] bg-cover bg-center">
             <div className="absolute inset-0 bg-gradient-to-r from-orange-950/90 via-orange-900/85 to-green-950/90 backdrop-blur-[2px]"></div>
           </div>
