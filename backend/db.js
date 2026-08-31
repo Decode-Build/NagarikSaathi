@@ -12,8 +12,9 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const connectDB = async () => {
   try {
-    if (process.env.MONGO_URI) {
-      const conn = await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 2000 });
+    const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/nagariksaathi';
+    if (uri) {
+      const conn = await mongoose.connect(uri, { serverSelectionTimeoutMS: 2000 });
       console.log(`MongoDB Connected: ${conn.connection.host}`);
       return;
     }
@@ -23,4 +24,4 @@ const connectDB = async () => {
   }
 };
 
-export default connectDB;
+export default connectDB;

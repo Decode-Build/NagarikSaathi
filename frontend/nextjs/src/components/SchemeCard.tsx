@@ -7,10 +7,18 @@ import { useTextToSpeech } from '../hooks/useTextToSpeech';
 interface SchemeCardProps {
   scheme: Scheme;
   onPrint: (scheme: Scheme) => void;
+  onOpenForm?: (scheme: Scheme) => void;
+  onShareWhatsAppModal?: (scheme: Scheme) => void;
   lang?: 'en' | 'hi';
 }
 
-export default function SchemeCard({ scheme, onPrint, lang = 'en' }: SchemeCardProps) {
+export default function SchemeCard({ 
+  scheme, 
+  onPrint, 
+  onOpenForm,
+  onShareWhatsAppModal,
+  lang = 'en' 
+}: SchemeCardProps) {
   const { speak, stop, isPlaying, currentText } = useTextToSpeech();
   
   const cardSpeechText = `${scheme.name}. ${scheme.overview}. ${
@@ -30,6 +38,11 @@ export default function SchemeCard({ scheme, onPrint, lang = 'en' }: SchemeCardP
   };
 
   const handleShareWhatsApp = () => {
+    if (onShareWhatsAppModal) {
+      onShareWhatsAppModal(scheme);
+      return;
+    }
+
     const shareMessage = `🏛️ *${scheme.name}*\n\n📝 *${
       lang === 'hi' ? 'योजना विवरण:' : 'Scheme Overview:'
     }*\n${scheme.overview}\n\n🎁 *${
@@ -140,23 +153,35 @@ export default function SchemeCard({ scheme, onPrint, lang = 'en' }: SchemeCardP
         )}
       </div>
 
-      {/* Action Buttons Footer */}
-      <div className="p-4 bg-slate-50 border-t border-gray-100/70 flex gap-2.5">
+      {/* Action Buttons Footer with Handout, Form, and Apply */}
+      <div className="p-4 bg-slate-50 border-t border-gray-100/70 grid grid-cols-3 gap-2">
         <button 
           onClick={() => onPrint(scheme)}
-          className="flex-1 bg-white text-gray-700 border border-gray-200 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 transition-all shadow-sm cursor-pointer"
+          className="bg-white text-gray-700 border border-gray-200 py-2.5 px-2 rounded-xl font-bold text-xs flex items-center justify-center hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 transition-all shadow-sm cursor-pointer text-center"
+          title={lang === 'hi' ? 'हैंडआउट प्रिंट करें' : 'Print Handout'}
         >
-          <Printer size={14} className="mr-1.5 text-orange-500 stroke-[2.5]" />
-          {lang === 'hi' ? 'प्रिंट करें' : 'Print Handout'}
+          <Printer size={13} className="mr-1 text-orange-500 shrink-0 stroke-[2.5]" />
+          <span className="truncate">{lang === 'hi' ? 'हैंडआउट' : 'Handout'}</span>
         </button>
+
+        <button 
+          onClick={() => onOpenForm && onOpenForm(scheme)}
+          className="bg-orange-50 hover:bg-orange-100 text-orange-800 border border-orange-200/80 py-2.5 px-2 rounded-xl font-bold text-xs flex items-center justify-center transition-all shadow-sm cursor-pointer hover:scale-[1.02] text-center"
+          title={lang === 'hi' ? 'आवेदन फॉर्म भरें' : 'Fill Application Form'}
+        >
+          <FileText size={13} className="mr-1 text-orange-600 shrink-0 stroke-[2.5]" />
+          <span className="truncate">{lang === 'hi' ? 'फॉर्म भरें' : 'Fill Form'}</span>
+        </button>
+
         <a 
           href={scheme.portalUrl} 
           target="_blank" 
           rel="noreferrer"
-          className="flex-1 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 text-white py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center hover:from-orange-600 hover:to-amber-600 transition-all shadow-md hover:shadow-lg transform active:scale-95 cursor-pointer text-center"
+          className="bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 text-white py-2.5 px-2 rounded-xl font-bold text-xs flex items-center justify-center hover:from-orange-600 hover:to-amber-600 transition-all shadow-md hover:shadow-lg transform active:scale-95 cursor-pointer text-center"
+          title={lang === 'hi' ? 'आधिकारिक पोर्टल पर आवेदन करें' : 'Apply Online'}
         >
-          {lang === 'hi' ? 'आवेदन करें' : 'Apply Online'}
-          <ExternalLink size={13} className="ml-1.5 stroke-[2.5]" />
+          <span className="truncate">{lang === 'hi' ? 'आवेदन' : 'Apply'}</span>
+          <ExternalLink size={12} className="ml-1 shrink-0 stroke-[2.5]" />
         </a>
       </div>
     </div>

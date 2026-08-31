@@ -42,10 +42,12 @@ if (!JWT_SECRET) {
 
 import authRoutes, { requireAuth, getUserFromHeader } from './routes/auth.js';
 import schemeRoutes from './routes/schemes.js';
+import integrationRoutes from './routes/integrations.js';
 
 // Setup Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', schemeRoutes);
+app.use('/api/integrations', integrationRoutes);
 
 // Initialize Gemini LLM
 let model = null;
