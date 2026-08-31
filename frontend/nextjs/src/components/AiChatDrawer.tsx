@@ -303,7 +303,7 @@ export default function AiChatDrawer({ lang }: AiChatDrawerProps) {
 
                         {/* Audio readout */}
                         <button
-                          onClick={() => isCurrentlySpeaking ? stopTts() : speak(displayText, isHindiText ? 'hi' : 'en')}
+                          onClick={() => isCurrentlySpeaking ? stopTts() : speak(displayText, lang)}
                           className={`flex items-center gap-1 px-2 py-0.5 rounded-full font-medium transition-colors ${
                             isCurrentlySpeaking ? 'bg-red-500 text-white animate-pulse' : 'text-orange-600 hover:text-orange-800'
                           }`}

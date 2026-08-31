@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, FileText, Search, Activity, ArrowLeft, CheckCircle2, 
   RefreshCw, Cpu, Database, Award, BarChart3, Clock,
-  Check, X, AlertTriangle, FilePlus2, ShieldAlert, Send, Upload
+  Check, X, AlertTriangle, FilePlus2, ShieldAlert, Send, Upload, Lock, KeyRound
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -81,6 +81,11 @@ export default function AdminDashboard() {
   });
   const [health, setHealth] = useState({ status: 'ok', dbState: 'connected', isMockMode: false });
   const [isLoading, setIsLoading] = useState(false);
+
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
 
   // HITL Draft Rule States
   const [draftRules, setDraftRules] = useState<DraftRule[]>([]);
@@ -195,14 +200,72 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    fetchLiveStats();
-    fetchPendingRules();
-    const interval = setInterval(() => {
+    if (isAuthenticated) {
       fetchLiveStats();
       fetchPendingRules();
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
+      const interval = setInterval(() => {
+        fetchLiveStats();
+        fetchPendingRules();
+      }, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin === '7389') {
+      setIsAuthenticated(true);
+      setPinError('');
+    } else {
+      setPinError('Incorrect PIN. Access denied.');
+      setPin('');
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center font-sans px-4">
+        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock size={32} />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900 mb-2">Admin Panel</h2>
+          <p className="text-sm text-gray-500 mb-6">Enter PIN to access operator dashboard.</p>
+          
+          <form onSubmit={handlePinSubmit} className="space-y-4">
+            <div>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  placeholder="Enter PIN"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-center tracking-[0.5em] font-black text-xl text-gray-900 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                  maxLength={4}
+                  autoFocus
+                />
+              </div>
+              {pinError && <p className="text-red-500 text-xs font-bold mt-2">{pinError}</p>}
+            </div>
+            
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold py-3 rounded-xl transition-all shadow-md mt-2"
+            >
+              Unlock
+            </button>
+          </form>
+          
+          <div className="mt-6">
+            <Link href="/" className="text-sm text-gray-500 hover:text-orange-600 font-semibold flex items-center justify-center gap-1 transition-colors">
+              <ArrowLeft size={14} /> Back to Portal
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-gray-900 flex flex-col font-sans">

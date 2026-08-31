@@ -322,38 +322,29 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
           }
         }
 
-        const langInstruction = preferredLang === 'hi'
-          ? 'LANGUAGE INSTRUCTION: The user has requested Hindi output. You MUST write your "answer" field in clear, polite Hindi (Devanagari script).'
+        // Language instruction - Hindi is enforced at top AND bottom of prompt
+        const hindiModeActive = preferredLang === 'hi';
+        const langInstruction = hindiModeActive
+          ? 'CRITICAL: Write the answer field ENTIRELY in Hindi Devanagari script. Do NOT write English sentences in the answer. Use nameHindi for scheme names.'
           : (preferredLang === 'en'
-            ? 'LANGUAGE INSTRUCTION: The user has requested English output. You MUST write your "answer" field in clear, polite English.'
-            : 'Auto-detect and match the user\'s language. If they query in Hindi (or Hinglish), respond in Hindi (using Devanagari script). If in English, respond in English.');
+            ? 'LANGUAGE RULE: Respond in clear English only.'
+            : 'Auto-detect: if query has Hindi/Devanagari respond in Hindi, else English.');
 
-        const systemPrompt = `You are "NagarikSaathi", an AI-powered government scheme discovery assistant for rural India.
-You are helping a CSC/VLE (Common Service Centre / Village Level Entrepreneur) operator who is assisting a rural citizen.
-The operator is typing on behalf of the citizen. The citizen is sitting beside the operator.
+        const systemPrompt = (hindiModeActive ? 'MANDATORY: RESPOND IN HINDI (DEVANAGARI) ONLY.\n\n' : '') +
+          'You are NagarikSaathi, a government scheme assistant for rural India.\n' +
+          'You help CSC/VLE operators assist rural citizens discover government schemes.\n\n' +
+          langInstruction + '\n\n' +
+          'Top relevant schemes (use nameHindi and descriptionHindi for Hindi answers):\n\n' +
+          JSON.stringify(topSchemes.map(s => ({ schemeId: s.schemeId, name: s.name, nameHindi: s.nameHindi || s.name, description: s.description, descriptionHindi: s.descriptionHindi || '', benefits: s.benefits, benefitsHindi: s.benefitsHindi || [] })), null, 2) + '\n\n' +
+          (userProfileText ? 'PROFILE: ' + userProfileText + '\n\n' : '') +
+          'RULES:\n' +
+          '1. Cite scheme names using schemeId in citedSchemeIds array.\n' +
+          '2. Never invent schemes, documents, or phone numbers not in the context above.\n' +
+          '3. If no clear match, set confidence to "low".\n' +
+          '4. Respond ONLY with JSON: { "answer": string, "citedSchemeIds": string[], "confidence": "high"|"medium"|"low" }\n' +
+          (hindiModeActive ? '\nFINAL REMINDER: answer MUST be 100% Hindi Devanagari. No English sentences allowed in the answer.\n' : '') +
+          '\nRespond ONLY with the JSON object. No text before or after.';
 
-Your job is to match the citizen's query with the available government schemes.
-Below is the list of top relevant government schemes retrieved for this query:
-
-${JSON.stringify(topSchemes.map(s => ({ schemeId: s.schemeId, name: s.name, nameHindi: s.nameHindi || s.name, description: s.description, benefits: s.benefits })), null, 2)}
-
-${userProfileText ? `RECOMMENDED PROFILE: ${userProfileText}\nFocus matches specifically on schemes applicable to their state and occupation, and evaluate eligibility metrics directly.` : ''}
-
-${langInstruction}
-
-LLM PROMPT RULES:
-1. Always cite scheme names explicitly (use their unique schemeId in your citedSchemeIds array).
-2. Never invent a scheme, document, or phone number not present in the retrieved context.
-3. If the query does not clearly match any scheme, or the query is irrelevant, set confidence to "low". Do not guess or hallucinate.
-4. If outputting in Hindi, make sure the "answer" field is written in Hindi (Devanagari), citing the scheme's name (and nameHindi if helpful).
-5. Always respond in JSON format with the following fields:
-   - "answer": (string) Your response text. Be clear, polite, and descriptive. Cite relevant schemes.
-   - "citedSchemeIds": (array of strings) The schemeId(s) of the matched schemes from the context. Only include schemeIds that are actually present in the context and relevant.
-   - "confidence": (string) "high" | "medium" | "low". Set to "high" for direct matches, "medium" for partial matches, "low" for no/low confidence matches.
-
-Remember: If confidence is "low", explain that you are uncertain in plain language.
-
-Respond ONLY with the JSON structure. Do not output any conversational filler before or after the JSON.`;
 
         // Format message history
         const historyMessages = session.messages.map(m => {
@@ -480,7 +471,75 @@ Respond ONLY with the JSON structure. Do not output any conversational filler be
   }
 });
 
-// 2. GET /api/chat/:sessionId
+// ─── POST /api/translate ────────────────────────────────────────────────────
+// Translates a piece of text between Hindi and English using Gemini.
+// Falls back to a rule-based map if the model is not available.
+app.post('/api/translate', async (req, res) => {
+  const { text, targetLang, sourceLang } = req.body;
+  if (!text || !targetLang) {
+    return res.status(400).json({ error: 'text and targetLang are required.' });
+  }
+
+  const effectiveTarget = targetLang === 'hi' ? 'hi' : 'en';
+
+  // Gemini-powered translation when available
+  if (model) {
+    try {
+      const langInstruction = effectiveTarget === 'hi'
+        ? 'Translate the following text into clear, natural Hindi (Devanagari script). Return ONLY the translated text, nothing else.'
+        : 'Translate the following text into clear, natural English. Return ONLY the translated text, nothing else.';
+
+      const translationPrompt = `${langInstruction}\n\nText to translate:\n${text}`;
+
+      const response = await Promise.race([
+        model.invoke([{ role: 'user', content: translationPrompt }]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Translation timeout')), 10000))
+      ]);
+
+      const translatedText = (response.content || '').trim();
+      if (translatedText) {
+        return res.json({
+          translatedText,
+          sourceLang: sourceLang || (effectiveTarget === 'hi' ? 'en' : 'hi'),
+          targetLang: effectiveTarget,
+          engine: 'gemini'
+        });
+      }
+    } catch (err) {
+      console.warn('Gemini translation failed, using rule-based fallback:', err.message);
+    }
+  }
+
+  // Rule-based fallback for common government scheme terms
+  const EN_TO_HI = {
+    'farmer': 'किसान', 'scheme': 'योजना', 'pension': 'पेंशन', 'loan': 'लोन',
+    'health': 'स्वास्थ्य', 'education': 'शिक्षा', 'women': 'महिला',
+    'housing': 'आवास', 'income': 'आय', 'eligibility': 'पात्रता',
+    'documents': 'दस्तावेज़', 'apply': 'आवेदन', 'benefit': 'लाभ',
+    'insurance': 'बीमा', 'subsidy': 'सब्सिडी', 'government': 'सरकार'
+  };
+  const HI_TO_EN = Object.fromEntries(Object.entries(EN_TO_HI).map(([k, v]) => [v, k]));
+
+  let result = text;
+  if (effectiveTarget === 'hi') {
+    Object.entries(EN_TO_HI).forEach(([en, hi]) => {
+      result = result.replace(new RegExp(`\\b${en}\\b`, 'gi'), hi);
+    });
+  } else {
+    Object.entries(HI_TO_EN).forEach(([hi, en]) => {
+      result = result.replace(new RegExp(hi, 'g'), en);
+    });
+  }
+
+  res.json({
+    translatedText: result,
+    sourceLang: sourceLang || (effectiveTarget === 'hi' ? 'en' : 'hi'),
+    targetLang: effectiveTarget,
+    engine: 'rule-based'
+  });
+});
+
+
 app.post('/api/chat/history', dpdpPurposeLimitationMiddleware, async (appReq, appRes) => {
   // Support both GET and POST for session initialization/history
   const { sessionId } = appReq.body;

@@ -329,7 +329,7 @@ export default function EmbeddedAiChat({ lang, onSchemesFound, initialQuery, onC
                       {/* Text-to-Speech Button */}
                       <button
                         type="button"
-                        onClick={() => isCurrentlySpeaking ? stopTts() : speak(displayText, isHindiText ? 'hi' : 'en')}
+                        onClick={() => isCurrentlySpeaking ? stopTts() : speak(displayText, lang)}
                         className={`flex items-center gap-1 px-2.5 py-1 rounded-full font-bold transition-all ${
                           isCurrentlySpeaking
                             ? 'bg-red-500 text-white animate-pulse shadow-sm'
