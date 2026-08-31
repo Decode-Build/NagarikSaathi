@@ -5,6 +5,8 @@ import EligibilityChecker, { EligibilityData } from '@/components/EligibilityChe
 import SchemeCard from '@/components/SchemeCard';
 import PrintableHandout from '@/components/PrintableHandout';
 import EmbeddedAiChat from '@/components/EmbeddedAiChat';
+import ApplicationFormModal from '@/components/ApplicationFormModal';
+import WhatsAppShareModal from '@/components/WhatsAppShareModal';
 import { mockSchemes, Scheme } from '@/data/schemes';
 import { Languages, Info, Sparkles, Filter } from 'lucide-react';
 
@@ -136,9 +138,19 @@ export default function Home() {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [printScheme, setPrintScheme] = useState<Scheme | null>(null);
+  const [formModalScheme, setFormModalScheme] = useState<Scheme | null>(null);
+  const [shareModalScheme, setShareModalScheme] = useState<Scheme | null>(null);
   const [isOnline, setIsOnline] = useState(true);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [currentSearchQuery, setCurrentSearchQuery] = useState<string>('');
+
+  const handleOpenForm = (scheme: Scheme) => {
+    setFormModalScheme(scheme);
+  };
+
+  const handleOpenShare = (scheme: Scheme) => {
+    setShareModalScheme(scheme);
+  };
 
   const t = translations[lang];
 
@@ -491,6 +503,8 @@ export default function Home() {
                     key={scheme.id} 
                     scheme={scheme} 
                     onPrint={handlePrint}
+                    onOpenForm={handleOpenForm}
+                    onShareWhatsAppModal={handleOpenShare}
                     lang={lang} 
                   />
                 ))}
@@ -529,6 +543,48 @@ export default function Home() {
             </div>
           </div>
         </footer>
+
+        {/* Handout Print Modal Preview */}
+        {printScheme && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4 no-print border-b pb-3">
+                <h3 className="font-black text-gray-900 text-lg">📄 Handout Document Preview</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    Print Handout (PDF)
+                  </button>
+                  <button
+                    onClick={() => setPrintScheme(null)}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-xs cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <PrintableHandout scheme={printScheme} />
+            </div>
+          </div>
+        )}
+
+        {/* Application Form Modal (Workflow 2 & Workflow 3) */}
+        <ApplicationFormModal
+          scheme={formModalScheme}
+          isOpen={Boolean(formModalScheme)}
+          onClose={() => setFormModalScheme(null)}
+          lang={lang}
+        />
+
+        {/* WhatsApp Share Modal (Workflow 1) */}
+        <WhatsAppShareModal
+          scheme={shareModalScheme}
+          isOpen={Boolean(shareModalScheme)}
+          onClose={() => setShareModalScheme(null)}
+          lang={lang}
+        />
       </div>
     </main>
   );
