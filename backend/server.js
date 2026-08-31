@@ -943,7 +943,11 @@ Respond ONLY with the JSON object. Do not output any markdown code blocks, forma
       status: "PENDING_REVIEW"
     });
 
-    await draftRule.save();
+    if (mongoose.connection.readyState === 1) {
+      await draftRule.save();
+    } else {
+      draftRule._id = new mongoose.Types.ObjectId();
+    }
     res.status(201).json(draftRule);
 
   } catch (err) {
@@ -955,6 +959,9 @@ Respond ONLY with the JSON object. Do not output any markdown code blocks, forma
 // 2. GET /api/rules/pending — Fetch all pending draft rules for staging queue
 app.get('/api/rules/pending', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.json([]);
+    }
     const pending = await DraftRule.find({ status: 'PENDING_REVIEW' }).sort({ createdAt: -1 });
     res.json(pending);
   } catch (err) {
@@ -966,6 +973,9 @@ app.get('/api/rules/pending', async (req, res) => {
 // 3. POST /api/rules/approve/:id — Approve draft rule (promote to Scheme collection)
 app.post('/api/rules/approve/:id', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database offline. Cannot approve rules." });
+    }
     const draft = await DraftRule.findById(req.params.id);
     if (!draft) {
       return res.status(404).json({ error: "Draft rule not found." });
@@ -1031,6 +1041,9 @@ app.post('/api/rules/approve/:id', async (req, res) => {
 // 4. POST /api/rules/reject/:id — Reject draft rule
 app.post('/api/rules/reject/:id', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database offline. Cannot reject rules." });
+    }
     const draft = await DraftRule.findById(req.params.id);
     if (!draft) {
       return res.status(404).json({ error: "Draft rule not found." });
