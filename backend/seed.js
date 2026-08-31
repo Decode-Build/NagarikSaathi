@@ -1261,6 +1261,41 @@ const schemesData = [
   }
 ];
 
+const demoSessions = [
+  {
+    sessionId: 'demo-session-001',
+    sessionType: 'operator',
+    messages: [
+      { role: 'user', content: 'kisan ke liye kya scheme hai MP mein', timestamp: new Date(Date.now() - 3600000) },
+      { role: 'assistant', content: 'PM-Kisan Samman Nidhi aur Mukhyamantri Kisan Kalyan Yojana aapke liye best hai...', sourceSchemeIds: ['pm-kisan', 'mp-kisan-kalyan'], confidence: 'high', timestamp: new Date(Date.now() - 3595000) }
+    ]
+  },
+  {
+    sessionId: 'demo-session-002',
+    sessionType: 'operator',
+    messages: [
+      { role: 'user', content: 'widow pension scheme in Madhya Pradesh', timestamp: new Date(Date.now() - 7200000) },
+      { role: 'assistant', content: 'Indira Gandhi National Widow Pension Scheme (IGNWPS) offers monthly financial assistance...', sourceSchemeIds: ['ign-widow-pension'], confidence: 'high', timestamp: new Date(Date.now() - 7195000) }
+    ]
+  },
+  {
+    sessionId: 'demo-session-003',
+    sessionType: 'self',
+    messages: [
+      { role: 'user', content: 'girl child education scheme', timestamp: new Date(Date.now() - 86400000) },
+      { role: 'assistant', content: 'Sukanya Samriddhi Yojana (SSY) provides a high-interest savings account for girl children...', sourceSchemeIds: ['sukanya-samriddhi'], confidence: 'high', timestamp: new Date(Date.now() - 86395000) }
+    ]
+  }
+];
+
+const demoProfiles = [
+  { sessionId: 'demo-p1', state: 'Madhya Pradesh', occupation: 'Farmer', gender: 'Male', maritalStatus: 'Married', landAcres: 2.5, annualIncome: 120000, casteCategory: 'OBC', languagePreference: 'hi', createdAt: new Date(Date.now() - 1800000) },
+  { sessionId: 'demo-p2', state: 'Uttar Pradesh', occupation: 'Artisan', gender: 'Male', maritalStatus: 'Married', landAcres: 0, annualIncome: 90000, casteCategory: 'SC', languagePreference: 'hi', createdAt: new Date(Date.now() - 3600000) },
+  { sessionId: 'demo-p3', state: 'Bihar', occupation: 'Student', gender: 'Female', maritalStatus: 'Single', landAcres: 0, annualIncome: 60000, casteCategory: 'OBC', languagePreference: 'hi', createdAt: new Date(Date.now() - 7200000) },
+  { sessionId: 'demo-p4', state: 'Maharashtra', occupation: 'Labourer', gender: 'Female', maritalStatus: 'Widowed', landAcres: 0, annualIncome: 45000, casteCategory: 'General', languagePreference: 'mr', createdAt: new Date(Date.now() - 14400000) },
+  { sessionId: 'demo-p5', state: 'Rajasthan', occupation: 'Unemployed', gender: 'Female', maritalStatus: 'Married', landAcres: 1, annualIncome: 80000, casteCategory: 'ST', languagePreference: 'hi', createdAt: new Date(Date.now() - 28800000) }
+];
+
 const seedDatabase = async () => {
   try {
     await connectDB();
@@ -1308,41 +1343,6 @@ const seedDatabase = async () => {
     await ChatSession.deleteMany({});
     await EligibilityProfile.deleteMany({});
 
-    const demoSessions = [
-      {
-        sessionId: 'demo-session-001',
-        sessionType: 'operator',
-        messages: [
-          { role: 'user', content: 'kisan ke liye kya scheme hai MP mein', timestamp: new Date(Date.now() - 3600000) },
-          { role: 'assistant', content: 'PM-Kisan Samman Nidhi aur Mukhyamantri Kisan Kalyan Yojana aapke liye best hai...', sourceSchemeIds: ['pm-kisan', 'mp-kisan-kalyan'], confidence: 'high', timestamp: new Date(Date.now() - 3595000) }
-        ]
-      },
-      {
-        sessionId: 'demo-session-002',
-        sessionType: 'operator',
-        messages: [
-          { role: 'user', content: 'widow pension scheme in Madhya Pradesh', timestamp: new Date(Date.now() - 7200000) },
-          { role: 'assistant', content: 'Indira Gandhi National Widow Pension Scheme (IGNWPS) offers monthly financial assistance...', sourceSchemeIds: ['ign-widow-pension'], confidence: 'high', timestamp: new Date(Date.now() - 7195000) }
-        ]
-      },
-      {
-        sessionId: 'demo-session-003',
-        sessionType: 'self',
-        messages: [
-          { role: 'user', content: 'girl child education scheme', timestamp: new Date(Date.now() - 86400000) },
-          { role: 'assistant', content: 'Sukanya Samriddhi Yojana (SSY) provides a high-interest savings account for girl children...', sourceSchemeIds: ['sukanya-samriddhi'], confidence: 'high', timestamp: new Date(Date.now() - 86395000) }
-        ]
-      }
-    ];
-
-    const demoProfiles = [
-      { sessionId: 'demo-p1', state: 'Madhya Pradesh', occupation: 'Farmer', gender: 'Male', maritalStatus: 'Married', landAcres: 2.5, annualIncome: 120000, casteCategory: 'OBC', languagePreference: 'hi', createdAt: new Date(Date.now() - 1800000) },
-      { sessionId: 'demo-p2', state: 'Uttar Pradesh', occupation: 'Artisan', gender: 'Male', maritalStatus: 'Married', landAcres: 0, annualIncome: 90000, casteCategory: 'SC', languagePreference: 'hi', createdAt: new Date(Date.now() - 3600000) },
-      { sessionId: 'demo-p3', state: 'Bihar', occupation: 'Student', gender: 'Female', maritalStatus: 'Single', landAcres: 0, annualIncome: 60000, casteCategory: 'OBC', languagePreference: 'hi', createdAt: new Date(Date.now() - 7200000) },
-      { sessionId: 'demo-p4', state: 'Maharashtra', occupation: 'Labourer', gender: 'Female', maritalStatus: 'Widowed', landAcres: 0, annualIncome: 45000, casteCategory: 'General', languagePreference: 'mr', createdAt: new Date(Date.now() - 14400000) },
-      { sessionId: 'demo-p5', state: 'Rajasthan', occupation: 'Unemployed', gender: 'Female', maritalStatus: 'Married', landAcres: 1, annualIncome: 80000, casteCategory: 'ST', languagePreference: 'hi', createdAt: new Date(Date.now() - 28800000) }
-    ];
-
     await ChatSession.insertMany(demoSessions);
     await EligibilityProfile.insertMany(demoProfiles);
     console.log('Successfully seeded demo sessions & profiles!');
@@ -1354,4 +1354,10 @@ const seedDatabase = async () => {
   }
 };
 
-seedDatabase();
+export { schemesData, demoSessions, demoProfiles, seedDatabase };
+
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('seed.js')) {
+  seedDatabase();
+}
+
+

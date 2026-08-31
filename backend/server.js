@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import connectDB from './db.js';
 import { Scheme, ChatSession, EligibilityProfile, User, DraftRule, SchemeVersion } from './models.js';
+import { schemesData } from './seed.js';
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import bcrypt from 'bcryptjs';
@@ -88,61 +89,62 @@ const parseGeminiResponse = (text) => {
 };
 
 // Mock Fallback matching engine for offline / key-less runs
-const getMockResponse = (message, schemes) => {
+const getMockResponse = (message, schemes, preferredLang) => {
   const query = message.toLowerCase();
   const citedIds = [];
   let answer = "";
   let answerHindi = "";
 
-  if (query.includes("kisan") || query.includes("farmer") || query.includes("किसान") || query.includes("खेती")) {
+  if (query.includes("kisan") || query.includes("farmer") || query.includes("किसान") || query.includes("खेती") || query.includes("fasal") || query.includes("फसल")) {
     citedIds.push("pm-kisan", "pm-fasal-bima");
     answer = "Based on your interest in farming, you might be eligible for Pradhan Mantri Kisan Samman Nidhi (PM-KISAN), which provides ₹6,000 yearly income support, and PM Fasal Bima Yojana for crop insurance.";
-    answerHindi = "खेती में आपकी रुचि के आधार पर, आप प्रधानमंत्री किसान सम्मान निधि (PM-KISAN) के लिए पात्र हो सकते हैं, जो ₹6,000 वार्षिक आय सहायता प्रदान करता है, और फसल बीमा के लिए पीएम फसल बीमा योजना।";
+    answerHindi = "खेती और किसान कल्याण के लिए, आप प्रधानमंत्री किसान सम्मान निधि (PM-KISAN) के पात्र हैं, जो ₹6,000 वार्षिक आय सहायता प्रदान करता है, और फसल सुरक्षा के लिए पीएम फसल बीमा योजना उपलब्ध है।";
   } else if (query.includes("gas") || query.includes("cylinder") || query.includes("ujjwala") || query.includes("गैस") || query.includes("सिलेंडर")) {
     citedIds.push("pm-ujjwala");
     answer = "For cooking gas assistance, the Pradhan Mantri Ujjwala Yojana (PMUY) provides free LPG connections to women from BPL families.";
     answerHindi = "रसोई गैस सहायता के लिए, प्रधानमंत्री उज्ज्वला योजना (PMUY) बीपीएल परिवारों की महिलाओं को मुफ्त एलपीजी कनेक्शन प्रदान करती है।";
-  } else if (query.includes("house") || query.includes("home") || query.includes("awas") || query.includes("घर") || query.includes("आवास")) {
+  } else if (query.includes("house") || query.includes("home") || query.includes("awas") || query.includes("घर") || query.includes("आवास") || query.includes("makan")) {
     citedIds.push("pm-awas-gramin");
     answer = "For housing assistance, Pradhan Mantri Awas Yojana (Gramin) provides financial assistance up to ₹1.2 Lakh to build permanent homes in rural areas.";
     answerHindi = "आवास सहायता के लिए, प्रधानमंत्री आवास योजना (ग्रामीण) ग्रामीण क्षेत्रों में पक्के घर बनाने के लिए ₹1.2 लाख तक की वित्तीय सहायता प्रदान करती है।";
-  } else if (query.includes("pension") || query.includes("old") || query.includes("widow") || query.includes("पेंशन") || query.includes("बुढ़ापा") || query.includes("विधवा")) {
+  } else if (query.includes("pension") || query.includes("old") || query.includes("widow") || query.includes("पेंशन") || query.includes("बुढ़ापा") || query.includes("विधवा") || query.includes("vridha")) {
     citedIds.push("atal-pension", "ign-old-age-pension", "ign-widow-pension");
     answer = "We found multiple pension schemes. For general old-age pension, Indira Gandhi National Old Age Pension Scheme offers monthly benefits to BPL seniors. Atal Pension Yojana is also available for contributions.";
     answerHindi = "हमें कई पेंशन योजनाएं मिलीं। सामान्य वृद्धावस्था पेंशन के लिए, इंदिरा गांधी राष्ट्रीय वृद्धावस्था पेंशन योजना बीपीएल वरिष्ठ नागरिकों को मासिक लाभ प्रदान करती है। योगदान के लिए अटल पेंशन योजना भी उपलब्ध है।";
-  } else if (query.includes("woman") || query.includes("girl") || query.includes("mother") || query.includes("महिला") || query.includes("लड़की") || query.includes("गर्भवती")) {
+  } else if (query.includes("woman") || query.includes("women") || query.includes("girl") || query.includes("mother") || query.includes("महिला") || query.includes("लड़की") || query.includes("गर्भवती") || query.includes("mahila") || query.includes("beti")) {
     citedIds.push("sukanya-samriddhi", "janani-suraksha", "pm-matru-vandana", "lakhpati-didi");
     answer = "For women and child welfare, Sukanya Samriddhi Yojana offers savings accounts for girls under 10. For pregnancy benefits, Pradhan Mantri Matru Vandana Yojana and Janani Suraksha Yojana offer cash incentives.";
-    answerHindi = "महिला एवं बाल कल्याण के लिए, सुकन्या समृद्धि योजना 10 वर्ष से कम उम्र की लड़कियों के लिए बचत खाते प्रदान करती है। गर्भावस्था के लाभों के लिए, प्रधानमंत्री मातृ वंदना योजना और जननी सुरक्षा योजना नकद प्रोत्साहन प्रदान करती हैं।";
-  } else if (query.includes("job") || query.includes("work") || query.includes("employment") || query.includes("nrega") || query.includes("रोजगार") || query.includes("काम")) {
+    answerHindi = "महिला एवं बाल कल्याण के लिए, सुकन्या समृद्धि योजना 10 वर्ष से कम उम्र की बेटियों के लिए बचत खाता प्रदान करती है। मातृत्व लाभ के लिए प्रधानमंत्री मातृ वंदना योजना और जननी सुरक्षा योजना वित्तीय सहायता देती हैं।";
+  } else if (query.includes("job") || query.includes("work") || query.includes("employment") || query.includes("nrega") || query.includes("रोजगार") || query.includes("काम") || query.includes("rojgar") || query.includes("majdoor")) {
     citedIds.push("mgnrega");
     answer = "For rural employment, MGNREGA guarantees 100 days of wage employment per financial year for manual labor.";
-    answerHindi = "ग्रामीण रोजगार के लिए, मनरेगा (MGNREGA) शारीरिक श्रम के लिए प्रति वित्तीय वर्ष 100 दिनों के मजदूरी रोजगार की गारंटी देता है।";
-  } else if (query.includes("loan") || query.includes("business") || query.includes("money") || query.includes("कर्ज") || query.includes("लोन") || query.includes("व्यापार")) {
+    answerHindi = "ग्रामीण रोजगार के लिए, मनरेगा (MGNREGA) शारीरिक श्रम के लिए प्रति वित्तीय वर्ष 100 दिनों के गारंटीकृत मजदूरी रोजगार की सुविधा देता है।";
+  } else if (query.includes("loan") || query.includes("business") || query.includes("money") || query.includes("कर्ज") || query.includes("लोन") || query.includes("व्यापार") || query.includes("mudra") || query.includes("karj") || query.includes("dukan")) {
     citedIds.push("pm-mudra", "pm-svanidhi", "pm-vishwakarma", "stand-up-india");
     answer = "For business loans, PM Mudra Yojana offers collateral-free loans up to ₹10 Lakh. PM SVANidhi offers micro loans up to ₹10,000 for street vendors. PM Vishwakarma supports traditional artisans.";
-    answerHindi = "व्यावसायिक ऋणों के लिए, पीएम मुद्रा योजना ₹10 लाख तक के संपार्श्विक-मुक्त ऋण प्रदान करती है। पीएम स्वनिधि रेहड़ी-पटरी वालों के लिए ₹10,000 तक के सूक्ष्म ऋण प्रदान करती है। पीएम विश्वकर्म पारंपरिक कारीगरों का समर्थन करती है।";
-  } else if (query.includes("health") || query.includes("hospital") || query.includes("ill") || query.includes("अस्पताल") || query.includes("इलाज") || query.includes("बीमारी")) {
+    answerHindi = "व्यावसायिक ऋणों के लिए, पीएम मुद्रा योजना ₹10 लाख तक के संपार्श्विक-मुक्त ऋण प्रदान करती है। पीएम स्वनिधि रेहड़ी-पटरी वालों के लिए ₹10,000 तक के सूक्ष्म ऋण प्रदान करती है और पीएम विश्वकर्मा कारीगरों का समर्थन करती है।";
+  } else if (query.includes("health") || query.includes("hospital") || query.includes("ill") || query.includes("अस्पताल") || query.includes("इलाज") || query.includes("बीमारी") || query.includes("ayushman") || query.includes("card") || query.includes("swasthya")) {
     citedIds.push("ayushman-bharat");
     answer = "For medical assistance, Ayushman Bharat (AB-PMJAY) provides free health cover of up to ₹5 Lakh per family per year for hospitalizations.";
-    answerHindi = "चिकित्सा सहायता के लिए, आयुष्मान भारत (AB-PMJAY) अस्पताल में भर्ती होने के लिए प्रति परिवार प्रति वर्ष ₹5 लाख तक का मुफ्त स्वास्थ्य कवर प्रदान करता है।";
-  } else if (query.includes("study") || query.includes("student") || query.includes("scholarship") || query.includes("school") || query.includes("पढ़ाई") || query.includes("छात्र") || query.includes("स्कॉलरशिप")) {
+    answerHindi = "चिकित्सा सहायता के लिए, आयुष्मान भारत (AB-PMJAY) अस्पताल में भर्ती होने पर प्रति परिवार प्रति वर्ष ₹5 लाख तक का मुफ्त स्वास्थ्य बीमा कवर प्रदान करता है।";
+  } else if (query.includes("study") || query.includes("student") || query.includes("scholarship") || query.includes("school") || query.includes("पढ़ाई") || query.includes("छात्र") || query.includes("स्कॉलरशिप") || query.includes("padhai") || query.includes("chhatravritti")) {
     citedIds.push("central-scholarship", "post-matric-sc", "pre-matric-sc", "means-cum-merit", "pm-poshan");
     answer = "For education, various scholarships are available including Post Matric Scholarship for SC students and Central Sector Scholarship for college students. PM Poshan provides mid-day meals.";
     answerHindi = "शिक्षा के लिए, विभिन्न छात्रवृत्तियां उपलब्ध हैं जिनमें अनुसूचित जाति के छात्रों के लिए पोस्ट मैट्रिक छात्रवृत्ति और कॉलेज के छात्रों के लिए केंद्रीय क्षेत्र की छात्रवृत्ति शामिल है। पीएम पोषण मध्याह्न भोजन प्रदान करता है।";
   } else {
     answer = "I'm sorry, I couldn't find a direct scheme match for your query. Please tell me more about your occupation, family income, or state, or visit your nearest Common Service Centre (CSC) for details.";
     answerHindi = "मुझे क्षमा करें, मुझे आपके प्रश्न के लिए कोई सीधा योजना मेल नहीं मिला। कृपया मुझे अपने व्यवसाय, पारिवारिक आय या राज्य के बारे में और बताएं, या विवरण के लिए अपने निकटतम सामान्य सेवा केंद्र (सीएससी) पर जाएं।";
+    const wantsHindi = preferredLang === 'hi' || (!preferredLang && Boolean(query.match(/[\u0900-\u097F]/)));
     return {
-      answer: (query.match(/[\u0900-\u097F]/) ? answerHindi : answer),
+      answer: wantsHindi ? answerHindi : answer,
       citedSchemeIds: [],
       confidence: "low"
     };
   }
 
-  const isHindi = query.match(/[\u0900-\u097F]/);
+  const wantsHindi = preferredLang === 'hi' || (!preferredLang && Boolean(query.match(/[\u0900-\u097F]/)));
   return {
-    answer: isHindi ? answerHindi : answer,
+    answer: wantsHindi ? answerHindi : answer,
     citedSchemeIds: citedIds,
     confidence: "high"
   };
@@ -205,7 +207,7 @@ const chatLimiter = rateLimit({
 
 // 1. POST /api/chat
 app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appReq, appRes) => {
-  const { message, sessionId, sessionType } = appReq.body;
+  const { message, sessionId, sessionType, preferredLang } = appReq.body;
 
   if (!message || !sessionId) {
     return appRes.status(400).json({ error: "Message and sessionId are required." });
@@ -214,7 +216,7 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
   try {
     // Retrieve or create chat session
     let session;
-    if (appReq.dpdpEphemeral) {
+    if (appReq.dpdpEphemeral || mongoose.connection.readyState !== 1) {
       if (!ephemeralSessions.has(sessionId)) {
         ephemeralSessions.set(sessionId, {
           sessionId,
@@ -228,20 +230,41 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
         session.sessionType = sessionType;
       }
     } else {
-      session = await ChatSession.findOne({ sessionId });
-      if (!session) {
-        session = new ChatSession({
-          sessionId,
-          sessionType: sessionType || 'self',
-          messages: []
-        });
-      } else if (sessionType) {
-        session.sessionType = sessionType;
+      try {
+        session = await ChatSession.findOne({ sessionId });
+        if (!session) {
+          session = new ChatSession({
+            sessionId,
+            sessionType: sessionType || 'self',
+            messages: []
+          });
+        } else if (sessionType) {
+          session.sessionType = sessionType;
+        }
+      } catch (e) {
+        if (!ephemeralSessions.has(sessionId)) {
+          ephemeralSessions.set(sessionId, {
+            sessionId,
+            sessionType: sessionType || 'self',
+            messages: [],
+            save: async function() { return this; }
+          });
+        }
+        session = ephemeralSessions.get(sessionId);
       }
     }
 
     // Fetch all schemes to build context
-    const schemes = await Scheme.find({});
+    let schemes = schemesData;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const dbSchemes = await Scheme.find({});
+        if (dbSchemes && dbSchemes.length > 0) schemes = dbSchemes;
+      } catch (e) {
+        console.warn("DB query failed in chat, using fallback schemes:", e.message);
+      }
+    }
+
 
     // Extract user profile from optional auth token
     let userProfileText = "";
@@ -299,31 +322,29 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
           }
         }
 
-        const systemPrompt = `You are "NagarikSaathi", an AI-powered government scheme discovery assistant for rural India.
-You are helping a CSC/VLE (Common Service Centre / Village Level Entrepreneur) operator who is assisting a rural citizen.
-The operator is typing on behalf of the citizen. The citizen is sitting beside the operator.
+        // Language instruction - Hindi is enforced at top AND bottom of prompt
+        const hindiModeActive = preferredLang === 'hi';
+        const langInstruction = hindiModeActive
+          ? 'CRITICAL: Write the answer field ENTIRELY in Hindi Devanagari script. Do NOT write English sentences in the answer. Use nameHindi for scheme names.'
+          : (preferredLang === 'en'
+            ? 'LANGUAGE RULE: Respond in clear English only.'
+            : 'Auto-detect: if query has Hindi/Devanagari respond in Hindi, else English.');
 
-Your job is to match the citizen's query with the available government schemes.
-Below is the list of top relevant government schemes retrieved for this query:
+        const systemPrompt = (hindiModeActive ? 'MANDATORY: RESPOND IN HINDI (DEVANAGARI) ONLY.\n\n' : '') +
+          'You are NagarikSaathi, a government scheme assistant for rural India.\n' +
+          'You help CSC/VLE operators assist rural citizens discover government schemes.\n\n' +
+          langInstruction + '\n\n' +
+          'Top relevant schemes (use nameHindi and descriptionHindi for Hindi answers):\n\n' +
+          JSON.stringify(topSchemes.map(s => ({ schemeId: s.schemeId, name: s.name, nameHindi: s.nameHindi || s.name, description: s.description, descriptionHindi: s.descriptionHindi || '', benefits: s.benefits, benefitsHindi: s.benefitsHindi || [] })), null, 2) + '\n\n' +
+          (userProfileText ? 'PROFILE: ' + userProfileText + '\n\n' : '') +
+          'RULES:\n' +
+          '1. Cite scheme names using schemeId in citedSchemeIds array.\n' +
+          '2. Never invent schemes, documents, or phone numbers not in the context above.\n' +
+          '3. If no clear match, set confidence to "low".\n' +
+          '4. Respond ONLY with JSON: { "answer": string, "citedSchemeIds": string[], "confidence": "high"|"medium"|"low" }\n' +
+          (hindiModeActive ? '\nFINAL REMINDER: answer MUST be 100% Hindi Devanagari. No English sentences allowed in the answer.\n' : '') +
+          '\nRespond ONLY with the JSON object. No text before or after.';
 
-${JSON.stringify(topSchemes.map(s => ({ schemeId: s.schemeId, name: s.name, nameHindi: s.nameHindi || s.name, description: s.description, benefits: s.benefits })), null, 2)}
-
-${userProfileText ? `RECOMMENDED PROFILE: ${userProfileText}\nFocus matches specifically on schemes applicable to their state and occupation, and evaluate eligibility metrics directly.` : ''}
-
-LLM PROMPT RULES:
-1. Always cite scheme names explicitly (use their unique schemeId in your citedSchemeIds array).
-2. Never invent a scheme, document, or phone number not present in the retrieved context.
-3. If the query does not clearly match any scheme, or the query is irrelevant, set confidence to "low". Do not guess or hallucinate.
-4. Auto-detect and match the user's language. If they query in Hindi, respond in Hindi (using Devanagari script). If in English, respond in English.
-5. If the user language is Hindi, make sure the "answer" field is written in Hindi, citing the scheme's name (and nameHindi if helpful).
-6. Always respond in JSON format with the following fields:
-   - "answer": (string) Your response text. Be clear, polite, and descriptive. Cite relevant schemes.
-   - "citedSchemeIds": (array of strings) The schemeId(s) of the matched schemes from the context. Only include schemeIds that are actually present in the context and relevant.
-   - "confidence": (string) "high" | "medium" | "low". Set to "high" for direct matches, "medium" for partial matches, "low" for no/low confidence matches.
-
-Remember: If confidence is "low", explain that you are uncertain in plain language.
-
-Respond ONLY with the JSON structure. Do not output any conversational filler before or after the JSON.`;
 
         // Format message history
         const historyMessages = session.messages.map(m => {
@@ -346,11 +367,11 @@ Respond ONLY with the JSON structure. Do not output any conversational filler be
         parsed = parseGeminiResponse(response.content);
       } catch (geminiError) {
         console.error("Gemini invocation failed, falling back to local rule-based match:", geminiError.message);
-        parsed = getMockResponse(message, schemes);
+        parsed = getMockResponse(message, schemes, preferredLang);
       }
     } else {
       // Mock mode
-      parsed = getMockResponse(message, schemes);
+      parsed = getMockResponse(message, schemes, preferredLang);
       // In mock mode, if userState is present and query doesn't yield results, let's inject userState schemes
       if (parsed.citedSchemeIds.length === 0 && userState) {
         const stateSchemes = schemes.filter(s => s.eligibility.states.includes(userState));
@@ -377,7 +398,19 @@ Respond ONLY with the JSON structure. Do not output any conversational filler be
     // Resolve cited scheme details with RAG embedding scores
     let sources = [];
     if (parsed.citedSchemeIds && parsed.citedSchemeIds.length > 0) {
-      const dbSources = await Scheme.find({ schemeId: { $in: parsed.citedSchemeIds } });
+      let dbSources = [];
+      if (mongoose.connection.readyState === 1) {
+        try {
+          dbSources = await Scheme.find({ schemeId: { $in: parsed.citedSchemeIds } });
+        } catch (err) {
+          console.warn("Error fetching from DB:", err);
+        }
+      }
+      if (dbSources.length === 0) {
+        dbSources = schemesData.filter(s => parsed.citedSchemeIds.includes(s.schemeId));
+        // wrap mock data with toObject so the mapping below works if needed
+        dbSources = dbSources.map(s => ({ ...s, toObject: () => s }));
+      }
       sources = dbSources.map(s => {
         const obj = s.toObject();
         let score = scoredSchemesMap[s.schemeId];
@@ -438,7 +471,75 @@ Respond ONLY with the JSON structure. Do not output any conversational filler be
   }
 });
 
-// 2. GET /api/chat/:sessionId
+// ─── POST /api/translate ────────────────────────────────────────────────────
+// Translates a piece of text between Hindi and English using Gemini.
+// Falls back to a rule-based map if the model is not available.
+app.post('/api/translate', async (req, res) => {
+  const { text, targetLang, sourceLang } = req.body;
+  if (!text || !targetLang) {
+    return res.status(400).json({ error: 'text and targetLang are required.' });
+  }
+
+  const effectiveTarget = targetLang === 'hi' ? 'hi' : 'en';
+
+  // Gemini-powered translation when available
+  if (model) {
+    try {
+      const langInstruction = effectiveTarget === 'hi'
+        ? 'Translate the following text into clear, natural Hindi (Devanagari script). Return ONLY the translated text, nothing else.'
+        : 'Translate the following text into clear, natural English. Return ONLY the translated text, nothing else.';
+
+      const translationPrompt = `${langInstruction}\n\nText to translate:\n${text}`;
+
+      const response = await Promise.race([
+        model.invoke([{ role: 'user', content: translationPrompt }]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Translation timeout')), 10000))
+      ]);
+
+      const translatedText = (response.content || '').trim();
+      if (translatedText) {
+        return res.json({
+          translatedText,
+          sourceLang: sourceLang || (effectiveTarget === 'hi' ? 'en' : 'hi'),
+          targetLang: effectiveTarget,
+          engine: 'gemini'
+        });
+      }
+    } catch (err) {
+      console.warn('Gemini translation failed, using rule-based fallback:', err.message);
+    }
+  }
+
+  // Rule-based fallback for common government scheme terms
+  const EN_TO_HI = {
+    'farmer': 'किसान', 'scheme': 'योजना', 'pension': 'पेंशन', 'loan': 'लोन',
+    'health': 'स्वास्थ्य', 'education': 'शिक्षा', 'women': 'महिला',
+    'housing': 'आवास', 'income': 'आय', 'eligibility': 'पात्रता',
+    'documents': 'दस्तावेज़', 'apply': 'आवेदन', 'benefit': 'लाभ',
+    'insurance': 'बीमा', 'subsidy': 'सब्सिडी', 'government': 'सरकार'
+  };
+  const HI_TO_EN = Object.fromEntries(Object.entries(EN_TO_HI).map(([k, v]) => [v, k]));
+
+  let result = text;
+  if (effectiveTarget === 'hi') {
+    Object.entries(EN_TO_HI).forEach(([en, hi]) => {
+      result = result.replace(new RegExp(`\\b${en}\\b`, 'gi'), hi);
+    });
+  } else {
+    Object.entries(HI_TO_EN).forEach(([hi, en]) => {
+      result = result.replace(new RegExp(hi, 'g'), en);
+    });
+  }
+
+  res.json({
+    translatedText: result,
+    sourceLang: sourceLang || (effectiveTarget === 'hi' ? 'en' : 'hi'),
+    targetLang: effectiveTarget,
+    engine: 'rule-based'
+  });
+});
+
+
 app.post('/api/chat/history', dpdpPurposeLimitationMiddleware, async (appReq, appRes) => {
   // Support both GET and POST for session initialization/history
   const { sessionId } = appReq.body;
@@ -520,6 +621,226 @@ app.get('/api/session/:sessionId/stats', async (appReq, appRes) => {
   } catch (error) {
     appRes.json({ citizensHelped: 0, avgResponseTimeMs: 0 }); // safe fallback
   }
+});
+
+// Offline Translation Dictionary & Rule-based Converter
+const OFFLINE_TRANSLATION_DICT = [
+  // Phrases
+  { en: "I am a farmer, I need subsidy", hi: "मैं एक किसान हूँ, मुझे सब्सिडी चाहिए" },
+  { en: "I want schemes for small farmers", hi: "मुझे छोटे किसानों के लिए योजनाएं चाहिए" },
+  { en: "Financial support for women", hi: "महिलाओं के लिए वित्तीय सहायता" },
+  { en: "How to get free ₹5 Lakh health cover?", hi: "₹5 लाख का मुफ्त इलाज कैसे मिलेगा?" },
+  { en: "Collateral-free business loans", hi: "बिना गारंटी व्यापार ऋण/लोन" },
+  { en: "How to apply for scheme?", hi: "योजना के लिए आवेदन कैसे करें?" },
+  { en: "Required documents for scheme", hi: "योजना के लिए आवश्यक दस्तावेज़" },
+  { en: "Check eligibility for government schemes", hi: "सरकारी योजनाओं के लिए अपनी पात्रता जांचें" },
+  { en: "Housing scheme for rural families", hi: "ग्रामीण परिवारों के लिए आवास योजना" },
+  { en: "Old age and widow pensions", hi: "वृद्धावस्था एवं विधवा पेंशन योजना" },
+  { en: "Scholarship for students", hi: "छात्रों के लिए छात्रवृत्ति योजना" },
+  { en: "Free ration and food security", hi: "मुफ्त राशन और खाद्य सुरक्षा" },
+  { en: "Pradhan Mantri Kisan Samman Nidhi", hi: "प्रधानमंत्री किसान सम्मान निधि" },
+  { en: "Ayushman Bharat Golden Card", hi: "आयुष्मान भारत गोल्डन कार्ड" },
+  { en: "PM Awas Yojana Gramin", hi: "पीएम आवास योजना ग्रामीण" },
+  { en: "PM Mudra Loan Scheme", hi: "पीएम मुद्रा लोन योजना" },
+  { en: "Sukanya Samriddhi Yojana", hi: "सुकन्या समृद्धि योजना" },
+  { en: "PM Ujjwala Yojana Free Gas", hi: "पीएम उज्ज्वला योजना मुफ्त गैस" },
+  // Common terms
+  { en: "farmer", hi: "किसान" },
+  { en: "farming", hi: "खेती / कृषि" },
+  { en: "subsidy", hi: "सब्सिडी / अनुदान" },
+  { en: "loan", hi: "ऋण / लोन" },
+  { en: "health", hi: "स्वास्थ्य" },
+  { en: "hospital", hi: "अस्पताल" },
+  { en: "pension", hi: "पेंशन" },
+  { en: "house", hi: "घर / पक्का मकान" },
+  { en: "housing", hi: "आवास" },
+  { en: "women", hi: "महिला" },
+  { en: "child", hi: "बाल / बच्चा" },
+  { en: "girl", hi: "बेटी / बालिका" },
+  { en: "education", hi: "शिक्षा" },
+  { en: "scholarship", hi: "छात्रवृत्ति" },
+  { en: "employment", hi: "रोजगार" },
+  { en: "job", hi: "काम / नौकरी" },
+  { en: "documents", hi: "दस्तावेज़" },
+  { en: "eligibility", hi: "पात्रता" },
+  { en: "benefits", hi: "लाभ" },
+  { en: "application", hi: "आवेदन" },
+  { en: "helpline", hi: "हेल्पलाइन" },
+  { en: "free", hi: "मुफ्त / निःशुल्क" },
+  { en: "yearly", hi: "वार्षिक" },
+  { en: "monthly", hi: "मासिक" },
+  { en: "money", hi: "पैसे / आर्थिक सहायता" },
+  { en: "support", hi: "सहायता" },
+  { en: "scheme", hi: "योजना" },
+  { en: "schemes", hi: "योजनाएं" },
+  { en: "government", hi: "सरकार / सरकारी" }
+];
+
+// Hinglish to Devanagari mapping for common phonetic inputs
+const HINGLISH_MAP = {
+  "kisan": "किसान",
+  "kisaan": "किसान",
+  "kheti": "खेती",
+  "yojana": "योजना",
+  "yojna": "योजना",
+  "loan": "लोन",
+  "karj": "कर्ज",
+  "paisa": "पैसा",
+  "paise": "पैसे",
+  "ghar": "घर",
+  "makan": "मकान",
+  "awas": "आवास",
+  "mahila": "महिला",
+  "mahilao": "महिलाओं",
+  "ladki": "लड़की",
+  "beti": "बेटी",
+  "bima": "बीमा",
+  "fasal": "फसल",
+  "chahiye": "चाहिए",
+  "kaise": "कैसे",
+  "kare": "करें",
+  "karein": "करें",
+  "milega": "मिलेगा",
+  "milta": "मिलता",
+  "hai": "है",
+  "hain": "हैं",
+  "mujhe": "मुझे",
+  "main": "मैं",
+  "hum": "हम",
+  "pension": "पेंशन",
+  "budhapa": "बुढ़ापा",
+  "vidhwa": "विधवा",
+  "chhatravritti": "छात्रवृत्ति",
+  "padhai": "पढ़ाई",
+  "chhatra": "छात्र",
+  "ration": "राशन",
+  "card": "कार्ड",
+  "shiksha": "शिक्षा",
+  "swasthya": "स्वास्थ्य",
+  "ilaj": "इलाज",
+  "dawa": "दवा",
+  "aspataal": "अस्पताल"
+};
+
+const translateOffline = (text, targetLang) => {
+  const clean = text.trim();
+  if (!clean) return "";
+
+  // 1. Direct phrase match check
+  for (const item of OFFLINE_TRANSLATION_DICT) {
+    if (targetLang === 'hi' && item.en.toLowerCase() === clean.toLowerCase()) {
+      return item.hi;
+    }
+    if (targetLang === 'en' && item.hi === clean) {
+      return item.en;
+    }
+  }
+
+  // 2. Hinglish conversion if target is Hindi and input is Latin script
+  if (targetLang === 'hi' && !clean.match(/[\u0900-\u097F]/)) {
+    const words = clean.split(/\s+/);
+    let convertedWords = words.map(w => {
+      const lower = w.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (HINGLISH_MAP[lower]) return HINGLISH_MAP[lower];
+      // Check offline dict terms
+      const found = OFFLINE_TRANSLATION_DICT.find(d => d.en.toLowerCase() === lower);
+      if (found) return found.hi;
+      return w;
+    });
+    
+    // Check if at least some words got converted
+    const hasConverted = convertedWords.some((w, idx) => w !== words[idx]);
+    if (hasConverted) {
+      return convertedWords.join(' ');
+    }
+  }
+
+  // 3. Word replacement fallback
+  if (targetLang === 'hi') {
+    let result = clean;
+    OFFLINE_TRANSLATION_DICT.forEach(d => {
+      const regex = new RegExp(`\\b${d.en}\\b`, 'gi');
+      result = result.replace(regex, d.hi);
+    });
+    return result;
+  } else {
+    let result = clean;
+    OFFLINE_TRANSLATION_DICT.forEach(d => {
+      const regex = new RegExp(d.hi, 'g');
+      result = result.replace(regex, d.en);
+    });
+    return result;
+  }
+};
+
+// 6. POST /api/translate — High accuracy bilingual translation between English & Hindi
+app.post('/api/translate', async (req, res) => {
+  const { text, targetLang, sourceLang } = req.body;
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return res.json({ originalText: text || '', translatedText: text || '', targetLang: targetLang || 'hi' });
+  }
+
+  const isHindiScript = Boolean(text.match(/[\u0900-\u097F]/));
+  const detectedSource = sourceLang || (isHindiScript ? 'hi' : 'en');
+  let effectiveTarget = targetLang;
+
+  if (!effectiveTarget) {
+    effectiveTarget = detectedSource === 'hi' ? 'en' : 'hi';
+  }
+
+  // If source and target are the same, toggle to other language
+  if (effectiveTarget === detectedSource && !targetLang) {
+    effectiveTarget = detectedSource === 'hi' ? 'en' : 'hi';
+  }
+
+  if (model) {
+    try {
+      const translationPrompt = `You are a professional English <-> Hindi translator for NagarikSaathi, an Indian Government welfare scheme assistance portal.
+Translate the following text strictly into ${effectiveTarget === 'hi' ? 'Hindi (in Devanagari script)' : 'fluent English'}.
+Context: Government schemes, citizen welfare, eligibility criteria, subsidy amounts, and documents.
+If the input text is Hinglish (Hindi written using English alphabet like "kisan yojana form kaise bhare"), translate and render it properly in ${effectiveTarget === 'hi' ? 'Hindi Devanagari' : 'English'}.
+Preserve numbers, currency symbols (₹), scheme abbreviations (e.g. PM-KISAN, PMUY, DBT) appropriately.
+Return ONLY the translated text without introductory remarks, explanations, or quotes.
+
+Input text:
+${text}`;
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Translation timeout")), 8000)
+      );
+
+      const response = await Promise.race([
+        model.invoke([
+          new SystemMessage("You are an expert bilingual government translator. Output only the pure translated text."),
+          new HumanMessage(translationPrompt)
+        ]),
+        timeoutPromise
+      ]);
+
+      const translatedText = (response.content || "").trim().replace(/^["']|["']$/g, '');
+      if (translatedText) {
+        return res.json({
+          originalText: text,
+          translatedText,
+          sourceLang: detectedSource,
+          targetLang: effectiveTarget,
+          engine: "gemini"
+        });
+      }
+    } catch (err) {
+      console.warn("Gemini translate error, falling back to offline dictionary:", err.message);
+    }
+  }
+
+  // Fallback offline translator
+  const offlineResult = translateOffline(text, effectiveTarget);
+  res.json({
+    originalText: text,
+    translatedText: offlineResult || text,
+    sourceLang: detectedSource,
+    targetLang: effectiveTarget,
+    engine: "offline-dictionary"
+  });
 });
 
 // ==========================================
@@ -681,7 +1002,11 @@ Respond ONLY with the JSON object. Do not output any markdown code blocks, forma
       status: "PENDING_REVIEW"
     });
 
-    await draftRule.save();
+    if (mongoose.connection.readyState === 1) {
+      await draftRule.save();
+    } else {
+      draftRule._id = new mongoose.Types.ObjectId();
+    }
     res.status(201).json(draftRule);
 
   } catch (err) {
@@ -693,6 +1018,9 @@ Respond ONLY with the JSON object. Do not output any markdown code blocks, forma
 // 2. GET /api/rules/pending — Fetch all pending draft rules for staging queue
 app.get('/api/rules/pending', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.json([]);
+    }
     const pending = await DraftRule.find({ status: 'PENDING_REVIEW' }).sort({ createdAt: -1 });
     res.json(pending);
   } catch (err) {
@@ -704,6 +1032,9 @@ app.get('/api/rules/pending', async (req, res) => {
 // 3. POST /api/rules/approve/:id — Approve draft rule (promote to Scheme collection)
 app.post('/api/rules/approve/:id', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database offline. Cannot approve rules." });
+    }
     const draft = await DraftRule.findById(req.params.id);
     if (!draft) {
       return res.status(404).json({ error: "Draft rule not found." });
@@ -769,6 +1100,9 @@ app.post('/api/rules/approve/:id', async (req, res) => {
 // 4. POST /api/rules/reject/:id — Reject draft rule
 app.post('/api/rules/reject/:id', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database offline. Cannot reject rules." });
+    }
     const draft = await DraftRule.findById(req.params.id);
     if (!draft) {
       return res.status(404).json({ error: "Draft rule not found." });

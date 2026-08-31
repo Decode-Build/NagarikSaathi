@@ -17,6 +17,7 @@
     "build:frontend": "npm run build --prefix frontend/nextjs"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "puppeteer-core": "^25.9.0"
   }
 }

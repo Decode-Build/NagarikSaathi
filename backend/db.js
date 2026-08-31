@@ -12,13 +12,15 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI);
-
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    if (process.env.MONGO_URI) {
+      const conn = await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 2000 });
+      console.log(`MongoDB Connected: ${conn.connection.host}`);
+      return;
+    }
+    console.log('No MONGO_URI provided, running in offline/mock mode.');
   } catch (error) {
-    console.error(`MongoDB Connection Error: ${error.message}`);
-    process.exit(1);
+    console.warn(`MongoDB Connection Note: ${error.message} - Backend running with local in-memory fallback.`);
   }
 };
 
-export default connectDB;
+export default connectDB;

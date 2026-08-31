@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+"use client";
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Extend the Window interface to include webkitSpeechRecognition
 declare global {
@@ -8,27 +9,36 @@ declare global {
   }
 }
 
-export const useSpeechRecognition = (lang: 'en' | 'hi' = 'en') => {
+export const useSpeechRecognition = (initialLang: 'en' | 'hi' = 'en') => {
   const [text, setText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recognition, setRecognition] = useState<any>(null);
+  const [voiceLang, setVoiceLang] = useState<'en' | 'hi'>(initialLang);
+  const recognitionRef = useRef<any>(null);
+  const [hasSupport, setHasSupport] = useState(false);
 
+  // Synchronize internal voice language when external prop changes
+  useEffect(() => {
+    setVoiceLang(initialLang);
+  }, [initialLang]);
+
+  // Initialize or re-configure recognition when voiceLang changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
+        setHasSupport(true);
         const recognitionInstance = new SpeechRecognition();
-        recognitionInstance.continuous = false;
+        recognitionInstance.continuous = true;
         recognitionInstance.interimResults = true;
-        recognitionInstance.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
+        recognitionInstance.lang = voiceLang === 'hi' ? 'hi-IN' : 'en-IN';
 
         recognitionInstance.onresult = (event: any) => {
-          let currentTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            currentTranscript += event.results[i][0].transcript;
+          let fullTranscript = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            fullTranscript += event.results[i][0].transcript;
           }
-          setText(currentTranscript);
+          setText(fullTranscript);
         };
 
         recognitionInstance.onend = () => {
@@ -36,58 +46,100 @@ export const useSpeechRecognition = (lang: 'en' | 'hi' = 'en') => {
         };
 
         recognitionInstance.onerror = (event: any) => {
-          // Log as warning rather than error so Next.js doesn't show full-screen overlays in dev mode
-          console.warn('Speech recognition error:', event.error);
-          setError(event.error);
+          console.warn('Speech recognition warning/error:', event.error);
+          if (event.error === 'not-allowed') {
+            setError('Microphone permission denied. Please allow microphone access.');
+          } else if (event.error === 'no-speech') {
+            setError(null); // normal timeout if user paused
+          } else {
+            setError(event.error);
+          }
           setIsListening(false);
         };
 
-        setRecognition(recognitionInstance);
+        recognitionRef.current = recognitionInstance;
       } else {
+        setHasSupport(false);
         console.warn('Speech recognition not supported in this browser.');
       }
     }
-  }, []);
 
-  // Update language dynamically when lang changes
-  useEffect(() => {
-    if (recognition) {
-      recognition.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
-    }
-  }, [lang, recognition]);
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [voiceLang]);
 
   const startListening = useCallback(() => {
-    if (recognition && !isListening) {
+    if (recognitionRef.current) {
       try {
         setError(null);
-        setText(''); // Reset text state when starting new mic capture
-        recognition.start();
+        setText('');
+        recognitionRef.current.lang = voiceLang === 'hi' ? 'hi-IN' : 'en-IN';
+        recognitionRef.current.start();
         setIsListening(true);
-      } catch (e) {
+      } catch (e: any) {
         console.warn('Failed to start speech recognition:', e);
-        setError('failed-to-start');
+        // If already active, restart
+        if (e.name === 'InvalidStateError') {
+          try {
+            recognitionRef.current.stop();
+            setTimeout(() => {
+              recognitionRef.current.start();
+              setIsListening(true);
+            }, 100);
+          } catch (retryErr) {
+            console.warn('Retry start failed:', retryErr);
+          }
+        } else {
+          setError('Microphone start error. Click to retry.');
+        }
       }
     }
-  }, [recognition, isListening]);
+  }, [voiceLang]);
 
   const stopListening = useCallback(() => {
-    if (recognition && isListening) {
+    if (recognitionRef.current) {
       try {
-        recognition.stop();
+        recognitionRef.current.stop();
       } catch (e) {
         console.warn('Failed to stop speech recognition:', e);
       }
       setIsListening(false);
     }
-  }, [recognition, isListening]);
+  }, []);
+
+  const toggleVoiceLang = useCallback(() => {
+    const nextLang = voiceLang === 'en' ? 'hi' : 'en';
+    setVoiceLang(nextLang);
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+    }
+  }, [voiceLang, isListening]);
+
+  const clearText = useCallback(() => {
+    setText('');
+    setError(null);
+  }, []);
 
   return {
     text,
     setText,
+    clearText,
     isListening,
     error,
+    voiceLang,
+    setVoiceLang,
+    toggleVoiceLang,
     startListening,
     stopListening,
-    hasSupport: !!recognition
+    hasSupport
   };
 };
