@@ -42,12 +42,10 @@ if (!JWT_SECRET) {
 
 import authRoutes, { requireAuth, getUserFromHeader } from './routes/auth.js';
 import schemeRoutes from './routes/schemes.js';
-import integrationRoutes from './routes/integrations.js';
 
 // Setup Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', schemeRoutes);
-app.use('/api/integrations', integrationRoutes);
 
 // Initialize Gemini LLM
 let model = null;
@@ -209,7 +207,8 @@ const chatLimiter = rateLimit({
 
 // 1. POST /api/chat
 app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appReq, appRes) => {
-  const { message, sessionId, sessionType, preferredLang } = appReq.body;
+  const { message, sessionId, sessionType, preferredLang, language } = appReq.body;
+  const activeLang = language || preferredLang;
 
   if (!message || !sessionId) {
     return appRes.status(400).json({ error: "Message and sessionId are required." });
@@ -325,12 +324,10 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
         }
 
         // Language instruction - Hindi is enforced at top AND bottom of prompt
-        const hindiModeActive = preferredLang === 'hi';
+        const hindiModeActive = activeLang === 'hi';
         const langInstruction = hindiModeActive
-          ? 'CRITICAL: Write the answer field ENTIRELY in Hindi Devanagari script. Do NOT write English sentences in the answer. Use nameHindi for scheme names.'
-          : (preferredLang === 'en'
-            ? 'LANGUAGE RULE: Respond in clear English only.'
-            : 'Auto-detect: if query has Hindi/Devanagari respond in Hindi, else English.');
+          ? 'CRITICAL LANGUAGE RULE: The user may ask questions in Hindi, English, or mixed Hinglish (e.g., "Farmers ke liye schemes"). Regardless of the input language, you MUST write the answer field ENTIRELY in pure Hindi Devanagari script. Do NOT write English sentences in the answer. Use nameHindi for scheme names.'
+          : 'CRITICAL LANGUAGE RULE: The user may ask questions in Hindi, English, or mixed Hinglish. Regardless of the input language, you MUST write the answer field ENTIRELY in clear English. Use the English scheme names.';
 
         const systemPrompt = (hindiModeActive ? 'MANDATORY: RESPOND IN HINDI (DEVANAGARI) ONLY.\n\n' : '') +
           'You are NagarikSaathi, a government scheme assistant for rural India.\n' +
@@ -1121,7 +1118,7 @@ app.post('/api/rules/reject/:id', async (req, res) => {
 });
 
 // Serve static frontend files from Vite build
-const frontendDist = path.join(__dirname, '../frontend/dist');
+const frontendDist = path.join(__dirname, '../frontend/vite/dist');
 app.use(express.static(frontendDist));
 
 // Wildcard fallback router to serve index.html for React SPA routing

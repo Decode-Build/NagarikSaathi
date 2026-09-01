@@ -1,52 +1,58 @@
 import React from 'react';
 import { ArrowLeft, Volume2, Printer, AlertTriangle, CreditCard, CheckSquare, Phone, ExternalLink, MessageCircle } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+
+import { useNavigate } from 'react-router-dom';
 
 export default function DetailScreen({ 
-  selectedScheme, chatSources, setPage, handleSpeechOutput, langMode, t, 
+  selectedScheme, chatSources, handleSpeechOutput, 
   citizenName, setCitizenName, isSchemeStale, formatDate, handleReportScheme 
 }) {
+  const { t, lang: langMode } = useLanguage();
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-8 animate-fade-in relative">
       
       {/* Nav back row (Hidden in Print) */}
-      <div className="no-print flex flex-wrap items-center justify-between gap-4">
+      <div className="no-print flex flex-wrap items-center justify-between gap-4 p-6 border-b border-gray-200">
         <button 
           onClick={() => {
-            if (chatSources.some(s => s.schemeId === selectedScheme.schemeId)) {
-              setPage('chat');
+            if (chatSources && chatSources.some(s => s.schemeId === selectedScheme.schemeId)) {
+              navigate('/chat');
             } else {
-              setPage('results');
+              navigate('/schemes');
             }
           }}
           className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors font-semibold"
         >
-          <ArrowLeft className="w-4 h-4" /> {t[langMode].backToList}
+          <ArrowLeft className="w-4 h-4" /> {t.backToList}
         </button>
 
         <div className="flex gap-2">
           {/* Voice Readout Button */}
           <button
             onClick={() => handleSpeechOutput(langMode === 'hi' ? selectedScheme.descriptionHindi : selectedScheme.description)}
-            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors"
-            aria-label={t[langMode].speakBtn}
+            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors"
+            aria-label={t.speakBtn}
           >
-            <Volume2 className="w-4 h-4 text-amber-600" />
-            <span>{t[langMode].speakBtn}</span>
+            <Volume2 className="w-4 h-4 text-green-600" />
+            <span>{t.speakBtn}</span>
           </button>
 
           <button 
             onClick={() => window.print()}
-            className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow-sm transition-colors flex items-center gap-2"
-            aria-label={t[langMode].printBtn}
+            className="bg-green-600 hover:bg-amber-700 text-white font-bold px-5 py-2.5 rounded text-sm shadow-sm transition-colors flex items-center gap-2"
+            aria-label={t.printBtn}
           >
-            <Printer className="w-4 h-4" /> {t[langMode].printBtn}
+            <Printer className="w-4 h-4" /> {t.printBtn}
           </button>
 
           <a 
             href={`https://wa.me/?text=Check out this government scheme: ${encodeURIComponent(langMode === 'hi' ? selectedScheme.nameHindi : selectedScheme.name)} - ${encodeURIComponent(window.location.href)}`}
             target="_blank" 
             rel="noopener noreferrer"
-            className="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow-sm transition-colors flex items-center gap-2"
+            className="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded text-sm shadow-sm transition-colors flex items-center gap-2"
           >
             <MessageCircle className="w-4 h-4" /> Share via WhatsApp
           </a>
@@ -54,23 +60,23 @@ export default function DetailScreen({
       </div>
 
       {/* Print Customizer Card (Hidden in Print) */}
-      <div className="no-print p-4 bg-white border border-slate-200 rounded-xl space-y-2 shadow-xs">
-        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">{t[langMode].printNotice}</label>
+      <div className="no-print p-4 bg-white border border-slate-200 rounded space-y-2 shadow-xs">
+        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">{t.printNotice}</label>
         <input
           type="text"
-          placeholder={t[langMode].printNamePlaceholder}
+          placeholder={t.printNamePlaceholder}
           value={citizenName}
           onChange={(e) => setCitizenName(e.target.value)}
-          className="w-full md:w-1/2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-amber-600 focus:bg-white transition-all font-medium"
+          className="w-full md:w-1/2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-green-600 focus:bg-white transition-all font-medium"
         />
       </div>
 
       {/* Printable Container */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-8 space-y-6 print-container print-card text-slate-800 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded p-8 space-y-6 print-container print-card text-slate-800 shadow-sm">
         
         {isSchemeStale(selectedScheme) && (
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 text-amber-800 text-sm no-print animate-pulse">
-            <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-600" />
+          <div className="p-4 bg-amber-50 border border-green-600 rounded flex items-start gap-3 text-amber-800 text-sm no-print animate-pulse">
+            <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0 text-green-600" />
             <div>
               <strong className="block text-amber-700 font-bold uppercase tracking-wider text-xs">⚠️ Data Staleness Warning / डेटा सत्यापन चेतावनी</strong>
               This scheme data has not been modified or verified for more than 90 days. Please cross-verify rules on the official VLE portal before confirming with the citizen.
@@ -111,10 +117,10 @@ export default function DetailScreen({
             {/* Benefits */}
             <div className="space-y-2">
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-amber-600" />
+                <CreditCard className="w-4 h-4 text-green-600" />
                 Benefits Provided / योजना के लाभ
               </h3>
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded">
                 <p className="text-sm text-slate-900 font-bold">
                   {langMode === 'hi' ? selectedScheme.benefitsHindi : selectedScheme.benefits}
                 </p>
@@ -139,12 +145,12 @@ export default function DetailScreen({
 
           {/* Documents Column */}
           <div className="space-y-6">
-            <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+            <div className="p-6 bg-slate-50 border border-slate-200 rounded space-y-4">
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-200 pb-2 flex items-center gap-2">
                 <CheckSquare className="w-4 h-4 text-green-600" />
-                {t[langMode].documentsTitle}
+                {t.documentsTitle}
               </h3>
-              <p className="text-[10px] text-slate-550 font-semibold">{t[langMode].documentsDesc}</p>
+              <p className="text-[10px] text-slate-550 font-semibold">{t.documentsDesc}</p>
               
               <ul className="space-y-3">
                 {selectedScheme.documents.map((doc, index) => (
@@ -158,7 +164,7 @@ export default function DetailScreen({
 
             <div className="space-y-3 text-xs">
               {/* Dynamic QR Code for Handouts */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col items-center gap-2 text-center">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded flex flex-col items-center gap-2 text-center">
                 <span className="text-[10px] text-amber-700 font-bold uppercase tracking-widest font-mono">Scan to Apply / स्कैन करें</span>
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=${encodeURIComponent(selectedScheme.applicationUrl || 'https://www.india.gov.in')}&color=0f172a&bgcolor=ffffff`}
@@ -168,9 +174,9 @@ export default function DetailScreen({
                 <span className="text-[9px] text-slate-500 font-mono font-medium">Scan code to open portal</span>
               </div>
 
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded space-y-2">
                 <div className="flex items-center gap-2 text-slate-700 font-bold">
-                  <Phone className="w-4 h-4 text-amber-600" />
+                  <Phone className="w-4 h-4 text-green-600" />
                   <span>Helpline: {selectedScheme.helplineNumber || '14545'}</span>
                 </div>
               </div>
@@ -179,7 +185,7 @@ export default function DetailScreen({
                 href={selectedScheme.applicationUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="no-print w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors flex items-center justify-center gap-2 font-bold shadow-xs"
+                className="no-print w-full py-3 rounded bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors flex items-center justify-center gap-2 font-bold shadow-xs"
               >
                 <ExternalLink className="w-4 h-4 text-slate-500" />
                 Official Portal Link &rarr;
@@ -196,11 +202,11 @@ export default function DetailScreen({
         {/* Signature Block (Only visible during print) */}
         <div className="hidden print:flex justify-between items-end mt-12 pt-12 border-t border-slate-300">
           <div className="text-center">
-            <div className="w-40 border-b border-slate-800 mb-2"></div>
+            <div className="w-40 border-b border-gray-200 mb-2"></div>
             <p className="text-xs font-bold text-slate-800">Citizen Signature / Thumbprint</p>
           </div>
           <div className="text-center">
-            <div className="w-48 border-b border-slate-800 mb-2"></div>
+            <div className="w-48 border-b border-gray-200 mb-2"></div>
             <p className="text-xs font-bold text-slate-800">Authorized CSC VLE Signature & Stamp</p>
             <p className="text-[10px] text-slate-500 mt-1">Generated by NagarikSaathi</p>
           </div>
@@ -212,7 +218,7 @@ export default function DetailScreen({
       <div className="no-print pt-4 flex justify-end">
         <button 
           onClick={() => handleReportScheme(selectedScheme.schemeId)}
-          className="text-xs text-slate-400 hover:text-red-650 font-bold hover:underline flex items-center gap-1.5 transition-colors"
+          className="text-xs text-gray-500 hover:text-red-650 font-bold hover:underline flex items-center gap-1.5 transition-colors"
           title="Flag outdated or incorrect information"
         >
           <AlertTriangle className="w-3.5 h-3.5" />

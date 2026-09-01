@@ -6,15 +6,11 @@
   "private": true,
   "scripts": {
     "install:backend": "npm install --prefix backend",
-    "install:frontend": "npm install --prefix frontend/nextjs",
-    "install:legacy": "npm install --prefix frontend/vite",
-    "install-all": "npm install && npm run install:backend && npm run install:frontend && npm run install:legacy",
-    "dev:backend": "npm run dev --prefix backend",
-    "dev:frontend": "npm run dev --prefix frontend/nextjs",
-    "dev:legacy": "npm run dev --prefix frontend/vite",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:old": "concurrently \"npm run dev:backend\" \"npm run dev:legacy\"",
-    "build:frontend": "npm run build --prefix frontend/nextjs"
+    "install:frontend": "npm install --prefix frontend/vite",
+    "install-all": "npm install && npm run install:backend && npm run install:frontend",
+    "build:frontend": "npm run build --prefix frontend/vite",
+    "start": "npm run build:frontend && node backend/server.js",
+    "dev": "npm run build:frontend && node backend/server.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
