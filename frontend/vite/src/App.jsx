@@ -96,24 +96,6 @@ export default function App() {
   const [chatConfidence, setChatConfidence] = useState(null);
   const [chatSources, setChatSources] = useState([]);
   const [operatorStats, setOperatorStats] = useState({ citizensHelped: 0, avgResponseTimeSec: null, matchRate: 'N/A', districtRank: 'N/A', categoriesMatched: [], recentActivity: [] });
-  
-  // OCR File Upload State
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [filePreview, setFilePreview] = useState(null);
-
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
-      setFilePreview(URL.createObjectURL(file));
-      showToast(langMode === 'hi' ? "दस्तावेज़ संलग्न किया गया" : "Document attached", "success");
-    }
-  };
-
-  const handleRemoveFile = () => {
-    setSelectedFile(null);
-    setFilePreview(null);
-  };
 
   // Eligibility Screener States
   const [profile, setProfile] = useState({
@@ -163,59 +145,24 @@ export default function App() {
     navigate('/chat');
   };
 
-  const handleSendMessage = async (e, textOverride = null) => {
+  const handleSendMessage = async (e, prefilledMsg = null) => {
     if (e) e.preventDefault();
-    const textToSend = textOverride || chatMessage;
-    if (!textToSend.trim() && !selectedFile) return;
+    const textToSend = prefilledMsg || chatMessage;
+    if (!textToSend.trim() || chatLoading) return;
 
+    const userMsg = { role: 'user', content: textToSend, timestamp: new Date() };
+    setChatHistory(prev => [...prev, userMsg]);
     setChatMessage('');
     setChatLoading(true);
-    
-    // Add user message to UI immediately
-    let newMsg = {
-      role: 'user',
-      content: textToSend,
-      timestamp: new Date()
-    };
-    if (filePreview) {
-      newMsg.image = filePreview;
-    }
-    
-    setChatHistory(prev => [...prev, newMsg]);
 
     try {
       setGlobalError('');
-      let response;
-      
-      // If a file is attached, process OCR first, then pass context to Chat
-      if (selectedFile) {
-        const formData = new FormData();
-        formData.append('document', selectedFile);
-        
-        // Let user know OCR is running
-        showToast(langMode === 'hi' ? "दस्तावेज़ का विश्लेषण हो रहा है..." : "Analyzing document...", "success");
-        
-        const ocrRes = await axios.post(`${API_BASE}/ocr`, formData, { timeout: 45000 });
-        
-        // Add OCR Result to the AI context by modifying textToSend
-        const ocrPrompt = `[DOCUMENT ATTACHED] I have uploaded a document. Here is the automated OCR extraction: ${JSON.stringify(ocrRes.data)}. User's message: ${textToSend}`;
-        
-        response = await axios.post(`${API_BASE}/chat`, {
-          message: ocrPrompt,
-          sessionId,
-          sessionType,
-          language: langMode
-        }, { timeout: 45000 });
-        
-        handleRemoveFile(); // Clear file after sending
-      } else {
-        response = await axios.post(`${API_BASE}/chat`, {
-          message: textToSend,
-          sessionId,
-          sessionType,
-          language: langMode
-        }, { timeout: 35000 });
-      }
+      const response = await axios.post(`${API_BASE}/chat`, {
+        message: textToSend,
+        sessionId,
+        sessionType,
+        language: langMode // explicitly pass language preference
+      }, { timeout: 35000 });
 
       const { answer, sources, confidence, isMockMode } = response.data;
       setChatHistory(prev => [...prev, {
@@ -365,10 +312,6 @@ export default function App() {
               formatDate={formatDate} 
               getDomain={getDomain} 
               handleSpeechOutput={handleSpeechOutput}
-              handleFileChange={handleFileChange}
-              handleRemoveFile={handleRemoveFile}
-              filePreview={filePreview}
-              selectedFile={selectedFile}
             />
           } />
           

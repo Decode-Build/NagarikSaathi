@@ -1,13 +1,12 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { MessageSquare, RefreshCw, AlertTriangle, Mic, Award, Check, Volume2, Paperclip, X } from 'lucide-react';
+import { MessageSquare, RefreshCw, AlertTriangle, Mic, Award, Check, Volume2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function ChatScreen({
   setPage, sessionType, operatorStats, chatHistory, currentUser,
   chatLoading, chatEndRef, handleSendMessage, chatMessage, setChatMessage,
-  startVoiceInput, isListening, chatSources, setSelectedScheme, formatDate, getDomain, handleSpeechOutput,
-  handleFileChange, handleRemoveFile, filePreview, selectedFile
+  startVoiceInput, isListening, chatSources, setSelectedScheme, formatDate, getDomain, handleSpeechOutput
 }) {
   const { t, lang: langMode } = useLanguage();
 
@@ -83,14 +82,7 @@ export default function ChatScreen({
                   
                   <div className="text-sm leading-relaxed whitespace-pre-line prose prose-slate">
                     {msg.role === 'user' ? (
-                      <>
-                        {msg.image && (
-                          <div className="mb-2">
-                            <img src={msg.image} alt="Uploaded document" className="max-h-40 rounded border border-amber-600/30" />
-                          </div>
-                        )}
-                        {msg.content}
-                      </>
+                      msg.content
                     ) : (
                       <>
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -147,22 +139,6 @@ export default function ChatScreen({
           <div ref={chatEndRef} />
         </div>
 
-        {/* File Preview Bar */}
-        {filePreview && (
-          <div className="px-4 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src={filePreview} alt="Preview" className="h-10 w-10 object-cover rounded border border-slate-300 shadow-sm" />
-              <div className="flex flex-col">
-                <span className="text-xs text-slate-800 font-bold line-clamp-1 max-w-[200px]">{selectedFile?.name}</span>
-                <span className="text-[10px] text-slate-500 font-medium">Ready for OCR Analysis</span>
-              </div>
-            </div>
-            <button type="button" onClick={handleRemoveFile} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
         {/* Chat Input form */}
         <form onSubmit={handleSendMessage} className="p-4 bg-slate-50 border-t border-slate-200 flex gap-3 items-center">
           <input
@@ -172,17 +148,6 @@ export default function ChatScreen({
             placeholder={t.chatPlaceholder}
             className="flex-grow bg-white border border-slate-200 focus:border-green-600 focus:ring-1 focus:ring-amber-600 focus:outline-none rounded px-4 py-3.5 text-sm text-slate-900 placeholder-slate-405 transition-colors shadow-xs"
           />
-
-          {/* File Upload Button */}
-          <div className="relative group">
-            <label className="cursor-pointer p-3.5 rounded border transition-all bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 shadow-xs flex items-center justify-center">
-              <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleFileChange} />
-              <Paperclip className="w-5 h-5" />
-            </label>
-            <span className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2.5 py-1 rounded bg-gray-50 border border-slate-950 text-[10px] text-white opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none shadow-md z-10">
-              Attach Document
-            </span>
-          </div>
 
           {/* Native Voice Input Button */}
           <div className="relative group">

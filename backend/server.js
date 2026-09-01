@@ -13,7 +13,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import multer from 'multer';
 import { dpdpPurposeLimitationMiddleware, zeroStorageComplianceMiddleware } from './middlewares/compliance.js';
 
 const ephemeralSessions = new Map();
@@ -43,12 +42,10 @@ if (!JWT_SECRET) {
 
 import authRoutes, { requireAuth, getUserFromHeader } from './routes/auth.js';
 import schemeRoutes from './routes/schemes.js';
-import integrationRoutes from './routes/integrations.js';
 
 // Setup Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', schemeRoutes);
-app.use('/api/integrations', integrationRoutes);
 
 // Initialize Gemini LLM
 let model = null;
@@ -555,42 +552,7 @@ app.post('/api/chat/history', dpdpPurposeLimitationMiddleware, async (appReq, ap
     }
     appRes.json(session);
   } catch (error) {
-    return appRes.status(500).json({ error: "Failed to load chat session." });
-  }
-});
-
-// Configure Multer for memory storage (temporary processing only)
-const upload = multer({ storage: multer.memoryStorage() });
-
-// 2b. POST /api/ocr - Document Verification
-app.post('/api/ocr', upload.single('document'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No document file uploaded.' });
-    
-    const b64 = req.file.buffer.toString('base64');
-    const mime = req.file.mimetype;
-    
-    const visionModel = new ChatGoogleGenerativeAI({
-      modelName: "gemini-1.5-flash", 
-      maxOutputTokens: 1024,
-      apiKey: process.env.GEMINI_API_KEY
-    });
-    
-    const message = new HumanMessage({
-      content: [
-        { type: "text", text: "You are an OCR and Document Verification AI for Indian Government Schemes. Extract details from this document and return a JSON object (strictly without markdown wrappers): { \"docType\": \"Aadhar / Income Certificate / Pan / etc\", \"extractedName\": \"...\", \"extractedDob\": \"...\", \"extractedValues\": { ...any other key values... }, \"verificationStatus\": \"Valid\" or \"Needs Manual Check\", \"issues\": [\"any blurriness, expiration, or mismatches\"] }" },
-        { type: "image_url", image_url: `data:${mime};base64,${b64}` }
-      ]
-    });
-    
-    const response = await visionModel.invoke([message]);
-    const jsonStr = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
-    const result = JSON.parse(jsonStr);
-    
-    res.json(result);
-  } catch (err) {
-    console.error("OCR Processing Error:", err);
-    res.status(500).json({ error: "Failed to process document OCR." });
+    appRes.status(500).json({ error: "Failed to retrieve history." });
   }
 });
 
