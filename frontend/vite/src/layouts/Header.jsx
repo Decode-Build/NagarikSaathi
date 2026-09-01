@@ -1,6 +1,6 @@
 import React from 'react';
 import { Menu } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function Header({ toggleSidebar }) {
   const { lang, setLang } = useLanguage();

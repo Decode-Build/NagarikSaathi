@@ -13,7 +13,10 @@
     "dev": "npm run build:frontend && node backend/server.js"
   },
   "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "concurrently": "^8.2.2",
-    "puppeteer-core": "^25.9.0"
+    "puppeteer-core": "^25.9.0",
+    "typescript": "^7.0.2"
   }
 }

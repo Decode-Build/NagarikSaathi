@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, List, MessageSquare, LayoutDashboard, HelpCircle, X } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { Home, List, MessageSquare, LayoutDashboard, HelpCircle, X, FileText, CheckSquare, Target, Settings, Globe, PlayCircle } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function Sidebar({ isOpen, toggleSidebar }) {
-  const { t } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
+
+  const toggleLanguage = () => {
+    setLang(lang === 'en' ? 'hi' : 'en');
+  };
 
   const navItems = [
+    { path: '/admin', icon: <LayoutDashboard size={20} />, label: t.adminPanel || 'Dashboard' },
     { path: '/', icon: <Home size={20} />, label: t.home || 'Home' },
     { path: '/schemes', icon: <List size={20} />, label: t.allSchemes || 'Schemes' },
-    { path: '/chat', icon: <MessageSquare size={20} />, label: t.aiSaathi || 'AI Sathi' },
-    { path: '/admin', icon: <LayoutDashboard size={20} />, label: t.adminPanel || 'Dashboard' },
-    { path: '/how-it-works', icon: <HelpCircle size={20} />, label: t.howItWorks || 'How NagrikSaathi Works' },
+    { path: '/documents', icon: <FileText size={20} />, label: t.documents || 'Documents' },
+    { path: '/applications', icon: <CheckSquare size={20} />, label: t.applications || 'Applications' },
+    { path: '/tracking', icon: <Target size={20} />, label: t.tracking || 'Tracking' },
+    { path: '/chat', icon: <MessageSquare size={20} />, label: t.aiSaathi || 'AI Saathi' },
+    { path: '/screener', icon: <Settings size={20} />, label: 'Filters' },
   ];
 
   return (
@@ -43,22 +50,44 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {navItems.map((item) => (
+          {navItems.map((item, idx) => (
             <NavLink
-              key={item.path}
+              key={`${item.path}-${idx}`}
               to={item.path}
               onClick={() => {
                 if (window.innerWidth < 768) toggleSidebar();
               }}
               className={({ isActive }) => `
                 flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors
-                ${isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
+                ${isActive && item.path !== '/#' ? 'bg-amber-50 text-amber-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
               `}
             >
               {item.icon}
               <span>{item.label}</span>
             </NavLink>
           ))}
+          
+          <button
+            onClick={toggleLanguage}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          >
+            <Globe size={20} />
+            <span>Hindi / English</span>
+          </button>
+          
+          <NavLink
+            to="/how-it-works"
+            onClick={() => {
+              if (window.innerWidth < 768) toggleSidebar();
+            }}
+            className={({ isActive }) => `
+              flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors
+              ${isActive ? 'bg-amber-50 text-amber-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
+            `}
+          >
+            <PlayCircle size={20} />
+            <span>End-to-End Demo</span>
+          </NavLink>
         </nav>
 
         <div className="p-4 border-t border-gray-200">

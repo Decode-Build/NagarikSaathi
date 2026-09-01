@@ -10,7 +10,7 @@ export const AppProvider = ({ children }) => {
   const [operatorStats, setOperatorStats] = useState({ citizensHelped: 0, avgResponseTimeSec: null, matchRate: 'N/A', districtRank: 'N/A', categoriesMatched: [], recentActivity: [] });
   
   const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-    ? 'http://localhost:5000/api'
+    ? 'http://localhost:5001/api'
     : `${window.location.origin}/api`;
 
   useEffect(() => {

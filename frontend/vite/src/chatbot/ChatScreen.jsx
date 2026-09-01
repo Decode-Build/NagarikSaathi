@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { MessageSquare, RefreshCw, AlertTriangle, Mic, Award, Check, Volume2 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function ChatScreen({
   setPage, sessionType, operatorStats, chatHistory, currentUser,

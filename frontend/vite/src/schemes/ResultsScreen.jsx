@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, Check, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../i18n/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')

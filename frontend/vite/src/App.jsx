@@ -1,21 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import Layout from './components/Layout.jsx';
+import Layout from './layouts/Layout.jsx';
 import axios from 'axios';
 import { AlertTriangle, Check } from 'lucide-react';
-import { useLanguage } from './context/LanguageContext';
+import { useLanguage } from './i18n/LanguageContext';
 
-import EligibilityScreener from './components/EligibilityScreener.jsx';
-import ResultsScreen from './components/ResultsScreen.jsx';
-import DetailScreen from './components/DetailScreen.jsx';
-import LandingScreen from './components/LandingScreen.jsx';
-import DashboardScreen from './components/DashboardScreen.jsx';
-import ChatScreen from './components/ChatScreen.jsx';
-import HowItWorks from './components/HowItWorks.jsx';
+import EligibilityScreener from './schemes/EligibilityScreener.jsx';
+import ResultsScreen from './schemes/ResultsScreen.jsx';
+import DetailScreen from './schemes/DetailScreen.jsx';
+import LandingScreen from './pages/LandingScreen.jsx';
+import DashboardScreen from './dashboard/DashboardScreen.jsx';
+import ChatScreen from './chatbot/ChatScreen.jsx';
+import HowItWorks from './pages/HowItWorks.jsx';
+import DocumentsScreen from './documents/DocumentsScreen.jsx';
+import ApplicationsScreen from './dashboard/ApplicationsScreen.jsx';
+import TrackingScreen from './tracking/TrackingScreen.jsx';
 
 const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
   ? 'http://localhost:5000/api'
-  : `${window.location.origin}/api`;
+  : 'https://nagriksathi-api.vercel.app/api';
 
 const generateSessionId = () => `sess-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -292,7 +295,7 @@ export default function App() {
 
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<LandingScreen initChatSession={initChatSession} />} />
+          <Route path="/" element={<LandingScreen initChatSession={initChatSession} handleSendMessage={handleSendMessage} />} />
           
           <Route path="/chat" element={
             <ChatScreen 
@@ -320,6 +323,9 @@ export default function App() {
           } />
           
           <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/documents" element={<DocumentsScreen />} />
+          <Route path="/applications" element={<ApplicationsScreen />} />
+          <Route path="/tracking" element={<TrackingScreen />} />
           
           <Route path="/screener" element={
             <EligibilityScreener profile={profile} setProfile={setProfile} handleRunScreener={handleRunScreener} screenerLoading={screenerLoading} />
