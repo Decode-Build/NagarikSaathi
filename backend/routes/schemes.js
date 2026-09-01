@@ -274,7 +274,26 @@ router.get('/schemes', async (req, res) => {
       });
     }
 
-    res.json(schemes);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    
+    // Default to pagination if requested, but allow a 'limit=0' or 'page=0' to return all if needed
+    if (page > 0 && limit > 0) {
+      const startIndex = (page - 1) * limit;
+      const endIndex = page * limit;
+      
+      const paginatedSchemes = schemes.slice(startIndex, endIndex);
+      
+      res.json({
+        total: schemes.length,
+        page,
+        limit,
+        totalPages: Math.ceil(schemes.length / limit),
+        schemes: paginatedSchemes
+      });
+    } else {
+      res.json(schemes);
+    }
   } catch (error) {
     console.error("Error retrieving schemes:", error);
     res.status(500).json({ error: "Failed to retrieve schemes." });

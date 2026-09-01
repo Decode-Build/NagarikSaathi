@@ -13,6 +13,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import multer from 'multer';
 import { dpdpPurposeLimitationMiddleware, zeroStorageComplianceMiddleware } from './middlewares/compliance.js';
 
 const ephemeralSessions = new Map();
@@ -209,7 +210,8 @@ const chatLimiter = rateLimit({
 
 // 1. POST /api/chat
 app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appReq, appRes) => {
-  const { message, sessionId, sessionType, preferredLang } = appReq.body;
+  const { message, sessionId, sessionType, preferredLang, language } = appReq.body;
+  const activeLang = language || preferredLang;
 
   if (!message || !sessionId) {
     return appRes.status(400).json({ error: "Message and sessionId are required." });
@@ -325,12 +327,10 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
         }
 
         // Language instruction - Hindi is enforced at top AND bottom of prompt
-        const hindiModeActive = preferredLang === 'hi';
+        const hindiModeActive = activeLang === 'hi';
         const langInstruction = hindiModeActive
-          ? 'CRITICAL: Write the answer field ENTIRELY in Hindi Devanagari script. Do NOT write English sentences in the answer. Use nameHindi for scheme names.'
-          : (preferredLang === 'en'
-            ? 'LANGUAGE RULE: Respond in clear English only.'
-            : 'Auto-detect: if query has Hindi/Devanagari respond in Hindi, else English.');
+          ? 'CRITICAL LANGUAGE RULE: The user may ask questions in Hindi, English, or mixed Hinglish (e.g., "Farmers ke liye schemes"). Regardless of the input language, you MUST write the answer field ENTIRELY in pure Hindi Devanagari script. Do NOT write English sentences in the answer. Use nameHindi for scheme names.'
+          : 'CRITICAL LANGUAGE RULE: The user may ask questions in Hindi, English, or mixed Hinglish. Regardless of the input language, you MUST write the answer field ENTIRELY in clear English. Use the English scheme names.';
 
         const systemPrompt = (hindiModeActive ? 'MANDATORY: RESPOND IN HINDI (DEVANAGARI) ONLY.\n\n' : '') +
           'You are NagarikSaathi, a government scheme assistant for rural India.\n' +
@@ -555,7 +555,42 @@ app.post('/api/chat/history', dpdpPurposeLimitationMiddleware, async (appReq, ap
     }
     appRes.json(session);
   } catch (error) {
-    appRes.status(500).json({ error: "Failed to retrieve history." });
+    return appRes.status(500).json({ error: "Failed to load chat session." });
+  }
+});
+
+// Configure Multer for memory storage (temporary processing only)
+const upload = multer({ storage: multer.memoryStorage() });
+
+// 2b. POST /api/ocr - Document Verification
+app.post('/api/ocr', upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No document file uploaded.' });
+    
+    const b64 = req.file.buffer.toString('base64');
+    const mime = req.file.mimetype;
+    
+    const visionModel = new ChatGoogleGenerativeAI({
+      modelName: "gemini-1.5-flash", 
+      maxOutputTokens: 1024,
+      apiKey: process.env.GEMINI_API_KEY
+    });
+    
+    const message = new HumanMessage({
+      content: [
+        { type: "text", text: "You are an OCR and Document Verification AI for Indian Government Schemes. Extract details from this document and return a JSON object (strictly without markdown wrappers): { \"docType\": \"Aadhar / Income Certificate / Pan / etc\", \"extractedName\": \"...\", \"extractedDob\": \"...\", \"extractedValues\": { ...any other key values... }, \"verificationStatus\": \"Valid\" or \"Needs Manual Check\", \"issues\": [\"any blurriness, expiration, or mismatches\"] }" },
+        { type: "image_url", image_url: `data:${mime};base64,${b64}` }
+      ]
+    });
+    
+    const response = await visionModel.invoke([message]);
+    const jsonStr = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
+    const result = JSON.parse(jsonStr);
+    
+    res.json(result);
+  } catch (err) {
+    console.error("OCR Processing Error:", err);
+    res.status(500).json({ error: "Failed to process document OCR." });
   }
 });
 
@@ -1121,7 +1156,7 @@ app.post('/api/rules/reject/:id', async (req, res) => {
 });
 
 // Serve static frontend files from Vite build
-const frontendDist = path.join(__dirname, '../frontend/dist');
+const frontendDist = path.join(__dirname, '../frontend/vite/dist');
 app.use(express.static(frontendDist));
 
 // Wildcard fallback router to serve index.html for React SPA routing
