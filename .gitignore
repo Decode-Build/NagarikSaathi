@@ -5,6 +5,8 @@ node_modules/
 # Next.js build output
 .next/
 **/out/
+next-env.d.ts
+*.tsbuildinfo
 
 # Vite build output
 dist/
