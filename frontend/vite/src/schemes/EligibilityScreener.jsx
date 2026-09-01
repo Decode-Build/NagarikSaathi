@@ -28,6 +28,23 @@ export default function EligibilityScreener({ profile, setProfile, handleRunScre
           </div>
 
           <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+              {langMode === 'hi' ? 'सामाजिक वर्ग (Category)' : 'Social Category'}
+            </label>
+            <select
+              value={profile.casteCategory || 'General'}
+              onChange={(e) => setProfile({...profile, casteCategory: e.target.value})}
+              className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-amber-650 focus:bg-white transition-colors"
+            >
+              <option value="General">General (सामान्य)</option>
+              <option value="OBC">OBC (अन्य पिछड़ा वर्ग)</option>
+              <option value="SC">SC (अनुसूचित जाति)</option>
+              <option value="ST">ST (अनुसूचित जनजाति)</option>
+              <option value="EWS">EWS (आर्थिक रूप से कमजोर)</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">{t.occLabel}</label>
             <div className="grid grid-cols-2 gap-2">
               {OCCUPATIONS.map((occ, idx) => (

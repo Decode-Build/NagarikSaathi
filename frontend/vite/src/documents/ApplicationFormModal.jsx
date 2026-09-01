@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Lock
 } from 'lucide-react';
+import { INDIAN_STATES } from '../utils/constants.js';
 
 export default function ApplicationFormModal({
   scheme,
@@ -81,12 +82,15 @@ export default function ApplicationFormModal({
 
   if (!isOpen || !scheme) return null;
 
-  const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5001/api';
+  const API_URL = import.meta.env?.VITE_API_URL 
+    || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:5000/api'
+      : '/api');
 
-  // Step 1: Send OTP to WhatsApp
+  // Step 1: Send OTP to WhatsApp (Workflow 3)
   const handleSendOtp = async () => {
     if (!phone || phone.replace(/\D/g, '').length < 10) {
-      setOtpError(lang === 'hi' ? 'αñòαÑâαñ¬αñ»αñ╛ 10 αñàαñéαñòαÑïαñé αñòαñ╛ αñ╡αÑêαñº αñ╡αÑìαñ╣αñ╛αñƒαÑìαñ╕αñÅαñ¬ αñ¿αñéαñ¼αñ░ αñªαñ░αÑìαñ£ αñòαñ░αÑçαñéαÑñ' : 'Please enter a valid 10-digit WhatsApp number.');
+      setOtpError(lang === 'hi' ? 'कृपया 10 अंकों का वैध व्हाट्सएप नंबर दर्ज करें।' : 'Please enter a valid 10-digit WhatsApp number.');
       return;
     }
 
@@ -110,14 +114,14 @@ export default function ApplicationFormModal({
         setOtpTimer(60);
         setOtpSuccess(
           lang === 'hi' 
-            ? 'αñ╡αÑìαñ╣αñ╛αñƒαÑìαñ╕αñÅαñ¬ αñ¬αñ░ OTP αñ¡αÑçαñ£αñ╛ αñùαñ»αñ╛!' 
+            ? 'व्हाट्सएप पर OTP भेजा गया!' 
             : 'OTP sent to your WhatsApp number!'
         );
       } else {
-        setOtpError(data.error || (lang === 'hi' ? 'OTP αñ¡αÑçαñ£αñ¿αÑç αñ«αÑçαñé αññαÑìαñ░αÑüαñƒαñ┐ αñ╣αÑüαñêαÑñ' : 'Failed to send OTP.'));
+        setOtpError(data.error || (lang === 'hi' ? 'OTP भेजने में त्रुटि हुई।' : 'Failed to send OTP.'));
       }
     } catch (err) {
-      setOtpError(lang === 'hi' ? 'αñ╕αñ░αÑìαñ╡αñ░ αñ╕αÑç αñòαñ¿αÑçαñòαÑìαñƒ αñòαñ░αñ¿αÑç αñ«αÑçαñé αñ╡αñ┐αñ½αñ▓αÑñ' : 'Could not connect to server.');
+      setOtpError(lang === 'hi' ? 'सर्वर से कनेक्ट करने में विफल।' : 'Could not connect to server.');
     } finally {
       setIsSendingOtp(false);
     }
@@ -126,7 +130,7 @@ export default function ApplicationFormModal({
   // Step 2: Verify WhatsApp OTP
   const handleVerifyOtp = async () => {
     if (!otp || otp.trim().length < 4) {
-      setOtpError(lang === 'hi' ? 'αñòαÑâαñ¬αñ»αñ╛ αñ╕αñ╣αÑÇ OTP αñªαñ░αÑìαñ£ αñòαñ░αÑçαñéαÑñ' : 'Please enter the 6-digit OTP code.');
+      setOtpError(lang === 'hi' ? 'कृपया 6 अंकों का OTP दर्ज करें।' : 'Please enter the 6-digit OTP code.');
       return;
     }
 
@@ -144,31 +148,31 @@ export default function ApplicationFormModal({
       if (res.ok && data.verified) {
         setIsPhoneVerified(true);
         setVerificationToken(data.verificationToken || 'verified');
-        setOtpSuccess(lang === 'hi' ? 'αñ╡αÑìαñ╣αñ╛αñƒαÑìαñ╕αñÅαñ¬ αñ¿αñéαñ¼αñ░ αñ╕αñ½αñ▓αññαñ╛αñ¬αÑéαñ░αÑìαñ╡αñò αñ╕αññαÑìαñ»αñ╛αñ¬αñ┐αññ αñ╣αÑüαñå!' : 'WhatsApp number verified successfully!');
+        setOtpSuccess(lang === 'hi' ? 'व्हाट्सएप नंबर सफलतापूर्वक सत्यापित हुआ!' : 'WhatsApp number verified successfully!');
       } else {
-        setOtpError(data.error || (lang === 'hi' ? 'αñàαñ«αñ╛αñ¿αÑìαñ» OTP αñòαÑïαñíαÑñ' : 'Invalid OTP.'));
+        setOtpError(data.error || (lang === 'hi' ? 'अमान्य OTP कोड।' : 'Invalid OTP.'));
       }
     } catch (err) {
-      setOtpError(lang === 'hi' ? 'αñ╕αññαÑìαñ»αñ╛αñ¬αñ¿ αñ«αÑçαñé αññαÑìαñ░αÑüαñƒαñ┐ αñ╣αÑüαñêαÑñ' : 'Failed to verify OTP.');
+      setOtpError(lang === 'hi' ? 'सत्यापन में त्रुटि हुई।' : 'Failed to verify OTP.');
     } finally {
       setIsVerifyingOtp(false);
     }
   };
 
-  // Step 3: Trigger n8n Auto-fill Form & Download
+  // Step 3: Trigger n8n Auto-fill Form & Download (Workflow 2)
   const handleSubmitApplication = async (e) => {
     e.preventDefault();
     if (!isPhoneVerified) {
       setErrorMessage(
         lang === 'hi'
-          ? 'ΓÜá∩╕Å αñ½αÑëαñ░αÑìαñ« αñíαñ╛αñëαñ¿αñ▓αÑïαñí αñòαñ░αñ¿αÑç αñòαÑç αñ▓αñ┐αñÅ αñòαÑâαñ¬αñ»αñ╛ αñ¬αñ╣αñ▓αÑç αñèαñ¬αñ░ αñàαñ¬αñ¿αñ╛ αñ╡αÑìαñ╣αñ╛αñƒαÑìαñ╕αñÅαñ¬ OTP αñ╕αññαÑìαñ»αñ╛αñ¬αñ┐αññ αñòαñ░αÑçαñéαÑñ'
-          : 'ΓÜá∩╕Å Please verify your WhatsApp number with OTP above before generating the application form.'
+          ? '⚠️ फॉर्म डाउनलोड करने के लिए कृपया पहले ऊपर अपना व्हाट्सएप OTP सत्यापित करें।'
+          : '⚠️ Please verify your WhatsApp number with OTP above before generating the application form.'
       );
       return;
     }
 
     if (!fullName.trim()) {
-      setErrorMessage(lang === 'hi' ? 'αñòαÑâαñ¬αñ»αñ╛ αñàαñ¬αñ¿αñ╛ αñ¬αÑéαñ░αñ╛ αñ¿αñ╛αñ« αñªαñ░αÑìαñ£ αñòαñ░αÑçαñéαÑñ' : 'Please enter your full name.');
+      setErrorMessage(lang === 'hi' ? 'कृपया अपना पूरा नाम दर्ज करें।' : 'Please enter your full name.');
       return;
     }
 
@@ -194,7 +198,7 @@ export default function ApplicationFormModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          schemeId: scheme.id,
+          schemeId: scheme.id || scheme.schemeId,
           schemeName: scheme.name,
           applicant: applicantPayload,
           verificationToken
@@ -226,10 +230,10 @@ export default function ApplicationFormModal({
           setDownloadUrl(data.downloadUrl);
         }
       } else {
-        setErrorMessage(data.error || (lang === 'hi' ? 'αñ½αÑëαñ░αÑìαñ« αñ╕αñ¼αñ«αñ┐αñƒ αñòαñ░αñ¿αÑç αñ«αÑçαñé αñ╡αñ┐αñ½αñ▓αÑñ' : 'Failed to submit application.'));
+        setErrorMessage(data.error || (lang === 'hi' ? 'फॉर्म सबमिट करने में विफल।' : 'Failed to submit application.'));
       }
     } catch (err) {
-      setErrorMessage(lang === 'hi' ? 'αñ╕αñ░αÑìαñ╡αñ░ αñ╕αÑç αñòαñ¿αÑçαñòαÑìαñƒ αñòαñ░αñ¿αÑç αñ«αÑçαñé αñ╡αñ┐αñ½αñ▓αÑñ' : 'Failed to connect to form auto-fill service.');
+      setErrorMessage(lang === 'hi' ? 'सर्वर से कनेक्ट करने में विफल।' : 'Failed to connect to form auto-fill service.');
     } finally {
       setIsSubmitting(false);
     }
@@ -263,17 +267,17 @@ export default function ApplicationFormModal({
       </head>
       <body>
         <div class="header">
-          <div class="title">≡ƒÅ¢∩╕Å NagarikSaathi - Scheme Application Form</div>
+          <div class="title">🏛️ NagarikSaathi - Scheme Application Form</div>
           <div class="app-id">Application Ref ID: ${applicationId || 'NS-APP-PROVISIONAL'}</div>
-          <div class="badge">Γ£ô WhatsApp Verified Submission</div>
+          <div class="badge">✓ WhatsApp Verified Submission</div>
         </div>
 
         <div class="section">
           <div class="section-title">1. Target Government Welfare Scheme</div>
           <div class="grid">
             <div><span class="field-label">Scheme Name:</span> <span class="field-value">${scheme.name}</span></div>
-            <div><span class="field-label">Official Portal:</span> <span class="field-value">${scheme.portalUrl || 'https://www.india.gov.in'}</span></div>
-            <div><span class="field-label">Helpline:</span> <span class="field-value">${scheme.helpline || '1800-111-999'}</span></div>
+            <div><span class="field-label">Official Portal:</span> <span class="field-value">${scheme.portalUrl || scheme.applicationUrl || 'https://www.india.gov.in'}</span></div>
+            <div><span class="field-label">Helpline:</span> <span class="field-value">${scheme.helpline || scheme.helplineNumber || '1800-111-999'}</span></div>
           </div>
         </div>
 
@@ -285,18 +289,19 @@ export default function ApplicationFormModal({
             <div><span class="field-label">Age & Gender:</span> <span class="field-value">${age || 'N/A'} Yrs / ${gender}</span></div>
             <div><span class="field-label">Category:</span> <span class="field-value">${category}</span></div>
             <div><span class="field-label">Occupation:</span> <span class="field-value">${occupation}</span></div>
-            <div><span class="field-label">Annual Family Income:</span> <span class="field-value">Γé╣${annualIncome || '0'}</span></div>
-            <div><span class="field-label">Aadhaar (Last 4):</span> <span class="field-value">XXXX-XXXX-${aadhaarLast4 || 'XXXX'}</span></div>
-            <div><span class="field-label">District & State:</span> <span class="field-value">${district || 'N/A'}, ${state}</span></div>
-            <div style="grid-column: span 2;"><span class="field-label">Address:</span> <span class="field-value">${address || 'N/A'}</span></div>
+            <div><span class="field-label">Annual Income:</span> <span class="field-value">₹${Number(annualIncome || 0).toLocaleString('en-IN')}</span></div>
+            <div><span class="field-label">Aadhaar (Last 4):</span> <span class="field-value">XXXX-XXXX-${aadhaarLast4 || 'N/A'}</span></div>
+            <div><span class="field-label">State / District:</span> <span class="field-value">${district ? `${district}, ` : ''}${state}</span></div>
           </div>
+          ${address ? `<div style="margin-top: 12px;"><span class="field-label">Address:</span> <span class="field-value">${address}</span></div>` : ''}
         </div>
 
         <div class="section">
-          <div class="section-title">3. Required Enclosures & Verification Checklist</div>
-          <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
-            ${(scheme.documents || ['Aadhaar Card', 'Bank Passbook', 'Income Certificate']).map(d => `<li>${d} (Original & Photocopy)</li>`).join('')}
-          </ul>
+          <div class="section-title">3. Verification & Compliance Stamp</div>
+          <div class="grid">
+            <div><span class="field-label">Verification Status:</span> <span class="field-value" style="color: #047857;">OTP Verified via WhatsApp</span></div>
+            <div><span class="field-label">Generated Timestamp:</span> <span class="field-value">${new Date().toLocaleString('en-IN')}</span></div>
+          </div>
         </div>
 
         <div class="footer">
@@ -324,7 +329,7 @@ export default function ApplicationFormModal({
         <div className="bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 text-white p-5 sm:p-6 relative">
           <button 
             onClick={onClose}
-            className="absolute top-5 right-5 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full transition-all"
+            className="absolute top-5 right-5 text-white/80 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full transition-all cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -332,7 +337,7 @@ export default function ApplicationFormModal({
           <div className="flex items-center gap-2 mb-2">
             <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase flex items-center gap-1.5">
               <Sparkles size={12} className="text-amber-200" />
-              {lang === 'hi' ? 'αñæαñƒαÑï-αñ½αñ┐αñ▓ αñåαñ╡αÑçαñªαñ¿ αñ½αÑëαñ░αÑìαñ«' : 'Auto-Fill Application Form'}
+              {lang === 'hi' ? 'ऑटो-फिल आवेदन फॉर्म' : 'Auto-Fill Application Form'}
             </span>
           </div>
 
@@ -340,7 +345,7 @@ export default function ApplicationFormModal({
             {scheme.name}
           </h2>
           <p className="text-orange-100 text-xs sm:text-sm font-medium line-clamp-2">
-            {scheme.overview}
+            {scheme.overview || scheme.description}
           </p>
         </div>
 
@@ -356,18 +361,18 @@ export default function ApplicationFormModal({
 
               <div>
                 <h3 className="text-2xl font-black text-gray-900">
-                  {lang === 'hi' ? 'αñåαñ╡αÑçαñªαñ¿ αñ½αÑëαñ░αÑìαñ« αñ╕αñ½αñ▓αññαñ╛αñ¬αÑéαñ░αÑìαñ╡αñò αññαÑêαñ»αñ╛αñ░!' : 'Application Form Ready!'}
+                  {lang === 'hi' ? 'आवेदन फॉर्म सफलतापूर्वक तैयार!' : 'Application Form Ready!'}
                 </h3>
                 <p className="text-gray-600 text-sm mt-1">
                   {lang === 'hi' 
-                    ? 'n8n αñæαñƒαÑïαñ«αÑçαñ╢αñ¿ αñçαñéαñ£αñ¿ αñªαÑìαñ╡αñ╛αñ░αñ╛ αñåαñ¬αñòαñ╛ αñåαñºαñ┐αñòαñ╛αñ░αñ┐αñò αñåαñ╡αÑçαñªαñ¿ αñ½αÑëαñ░αÑìαñ« αñ¡αñ░ αñªαñ┐αñ»αñ╛ αñùαñ»αñ╛ αñ╣αÑêαÑñ'
+                    ? 'n8n ऑटोमेशन इंजन द्वारा आपका आधिकारिक आवेदन फॉर्म भर दिया गया है।'
                     : 'Your official application form has been generated and pre-filled via n8n automation engine.'}
                 </p>
               </div>
 
               {applicationId && (
                 <div className="inline-block bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl text-orange-900 font-bold text-sm">
-                  {lang === 'hi' ? 'αñåαñ╡αÑçαñªαñ¿ αñ╕αñéαñªαñ░αÑìαñ¡ αñòαÑìαñ░αñ«αñ╛αñéαñò:' : 'Application Ref ID:'} <span className="font-mono text-orange-700">{applicationId}</span>
+                  {lang === 'hi' ? 'आवेदन संदर्भ क्रमांक:' : 'Application Ref ID:'} <span className="font-mono text-orange-700">{applicationId}</span>
                 </div>
               )}
 
@@ -377,17 +382,17 @@ export default function ApplicationFormModal({
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold px-6 py-3.5 rounded-2xl shadow-lg hover:shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
                   <Download size={18} />
-                  <span>{lang === 'hi' ? 'αñ¡αñ░αñ╛ αñ╣αÑüαñå αñ½αÑëαñ░αÑìαñ« αñíαñ╛αñëαñ¿αñ▓αÑïαñí αñòαñ░αÑçαñé' : 'Download Pre-filled Form'}</span>
+                  <span>{lang === 'hi' ? 'भरा हुआ फॉर्म डाउनलोड करें' : 'Download Pre-filled Form'}</span>
                 </button>
 
-                {scheme.portalUrl && (
+                {(scheme.portalUrl || scheme.applicationUrl) && (
                   <a
-                    href={scheme.portalUrl}
+                    href={scheme.portalUrl || scheme.applicationUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="bg-white border border-gray-200 hover:bg-orange-50 text-gray-800 font-bold px-5 py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all"
                   >
-                    <span>{lang === 'hi' ? 'αñåαñºαñ┐αñòαñ╛αñ░αñ┐αñò αñ¬αÑïαñ░αÑìαñƒαñ▓ αñûαÑïαñ▓αÑçαñé' : 'Open Official Portal'}</span>
+                    <span>{lang === 'hi' ? 'आधिकारिक पोर्टल खोलें' : 'Open Official Portal'}</span>
                     <ExternalLink size={16} />
                   </a>
                 )}
@@ -401,20 +406,20 @@ export default function ApplicationFormModal({
               <div className="space-y-4">
                 <h4 className="text-xs font-extrabold text-orange-800 uppercase tracking-widest flex items-center gap-1.5 border-b border-orange-100 pb-2">
                   <User size={15} className="text-orange-600" />
-                  {lang === 'hi' ? '1. αñåαñ╡αÑçαñªαñò αñòαñ╛ αñ╡αñ┐αñ╡αñ░αñú (Applicant Details)' : '1. Applicant Information'}
+                  {lang === 'hi' ? '1. आवेदक का विवरण (Applicant Details)' : '1. Applicant Information'}
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {lang === 'hi' ? 'αñ¬αÑéαñ░αñ╛ αñ¿αñ╛αñ« *' : 'Full Name *'}
+                      {lang === 'hi' ? 'पूरा नाम *' : 'Full Name *'}
                     </label>
                     <input
                       type="text"
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder={lang === 'hi' ? 'αñëαñªαñ╛. αñ░αñ«αÑçαñ╢ αñòαÑüαñ«αñ╛αñ░' : 'e.g. Ramesh Kumar'}
+                      placeholder={lang === 'hi' ? 'उदा. रमेश कुमार' : 'e.g. Ramesh Kumar'}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium text-gray-900 bg-slate-50/50"
                     />
                   </div>
@@ -422,7 +427,7 @@ export default function ApplicationFormModal({
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        {lang === 'hi' ? 'αñåαñ»αÑü (αñ╡αñ░αÑìαñ╖)' : 'Age (Yrs)'}
+                        {lang === 'hi' ? 'आयु (वर्ष)' : 'Age (Yrs)'}
                       </label>
                       <input
                         type="number"
@@ -436,59 +441,59 @@ export default function ApplicationFormModal({
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        {lang === 'hi' ? 'αñ▓αñ┐αñéαñù' : 'Gender'}
+                        {lang === 'hi' ? 'लिंग' : 'Gender'}
                       </label>
                       <select
                         value={gender}
                         onChange={(e) => setGender(e.target.value)}
                         className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium text-gray-900 bg-slate-50/50"
                       >
-                        <option value="Male">{lang === 'hi' ? 'αñ¬αÑüαñ░αÑüαñ╖ (Male)' : 'Male'}</option>
-                        <option value="Female">{lang === 'hi' ? 'αñ«αñ╣αñ┐αñ▓αñ╛ (Female)' : 'Female'}</option>
-                        <option value="Other">{lang === 'hi' ? 'αñàαñ¿αÑìαñ» (Other)' : 'Other'}</option>
+                        <option value="Male">{lang === 'hi' ? 'पुरुष (Male)' : 'Male'}</option>
+                        <option value="Female">{lang === 'hi' ? 'महिला (Female)' : 'Female'}</option>
+                        <option value="Other">{lang === 'hi' ? 'अन्य (Other)' : 'Other'}</option>
                       </select>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {lang === 'hi' ? 'αñ╕αñ╛αñ«αñ╛αñ£αñ┐αñò αñ╡αñ░αÑìαñù (Category)' : 'Category'}
+                      {lang === 'hi' ? 'सामाजिक वर्ग (Category)' : 'Category'}
                     </label>
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium text-gray-900 bg-slate-50/50"
                     >
-                      <option value="General">General</option>
-                      <option value="OBC">OBC (αñàαñ¿αÑìαñ» αñ¬αñ┐αñ¢αñíαñ╝αñ╛ αñ╡αñ░αÑìαñù)</option>
-                      <option value="SC">SC (αñàαñ¿αÑüαñ╕αÑéαñÜαñ┐αññ αñ£αñ╛αññαñ┐)</option>
-                      <option value="ST">ST (αñàαñ¿αÑüαñ╕αÑéαñÜαñ┐αññ αñ£αñ¿αñ£αñ╛αññαñ┐)</option>
-                      <option value="EWS">EWS</option>
+                      <option value="General">General (सामान्य)</option>
+                      <option value="OBC">OBC (अन्य पिछड़ा वर्ग)</option>
+                      <option value="SC">SC (अनुसूचित जाति)</option>
+                      <option value="ST">ST (अनुसूचित जनजाति)</option>
+                      <option value="EWS">EWS (आर्थिक रूप से कमजोर)</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {lang === 'hi' ? 'αñ╡αÑìαñ»αñ╡αñ╕αñ╛αñ» (Occupation)' : 'Occupation'}
+                      {lang === 'hi' ? 'व्यवसाय (Occupation)' : 'Occupation'}
                     </label>
                     <select
                       value={occupation}
                       onChange={(e) => setOccupation(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium text-gray-900 bg-slate-50/50"
                     >
-                      <option value="Farmer">{lang === 'hi' ? 'αñòαñ┐αñ╕αñ╛αñ¿ (Farmer)' : 'Farmer'}</option>
-                      <option value="Daily Wage Laborer">{lang === 'hi' ? 'αñªαÑêαñ¿αñ┐αñò αñ«αñ£αñªαÑéαñ░ (Daily Wage)' : 'Daily Wage Laborer'}</option>
-                      <option value="Self Employed">{lang === 'hi' ? 'αñ╕αÑìαñ╡αñ░αÑïαñ£αñùαñ╛αñ░ (Self-Employed)' : 'Self-Employed'}</option>
-                      <option value="Artisan">{lang === 'hi' ? 'αñòαñ╛αñ░αÑÇαñùαñ░ (Artisan)' : 'Artisan'}</option>
-                      <option value="Student">{lang === 'hi' ? 'αñ¢αñ╛αññαÑìαñ░ (Student)' : 'Student'}</option>
-                      <option value="Homemaker">{lang === 'hi' ? 'αñùαÑâαñ╣αñúαÑÇ (Homemaker)' : 'Homemaker'}</option>
-                      <option value="Other">{lang === 'hi' ? 'αñàαñ¿αÑìαñ» (Other)' : 'Other'}</option>
+                      <option value="Farmer">{lang === 'hi' ? 'किसान (Farmer)' : 'Farmer'}</option>
+                      <option value="Daily Wage Laborer">{lang === 'hi' ? 'दैनिक मजदूर (Daily Wage)' : 'Daily Wage Laborer'}</option>
+                      <option value="Self Employed">{lang === 'hi' ? 'स्वरोजगार (Self-Employed)' : 'Self-Employed'}</option>
+                      <option value="Artisan">{lang === 'hi' ? 'कारीगर (Artisan)' : 'Artisan'}</option>
+                      <option value="Student">{lang === 'hi' ? 'छात्र (Student)' : 'Student'}</option>
+                      <option value="Homemaker">{lang === 'hi' ? 'गृहणी (Homemaker)' : 'Homemaker'}</option>
+                      <option value="Other">{lang === 'hi' ? 'अन्य (Other)' : 'Other'}</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {lang === 'hi' ? 'αñ╡αñ╛αñ░αÑìαñ╖αñ┐αñò αñåαñ» (Γé╣ Annual Income)' : 'Annual Income (Γé╣)'}
+                      {lang === 'hi' ? 'वार्षिक आय (₹ Annual Income)' : 'Annual Income (₹)'}
                     </label>
                     <input
                       type="number"
@@ -501,7 +506,7 @@ export default function ApplicationFormModal({
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {lang === 'hi' ? 'αñåαñºαñ╛αñ░ αñòαñ╛αñ░αÑìαñí (αñàαñéαññαñ┐αñ« 4 αñàαñéαñò)' : 'Aadhaar (Last 4 Digits)'}
+                      {lang === 'hi' ? 'आधार कार्ड (अंतिम 4 अंक)' : 'Aadhaar (Last 4 Digits)'}
                     </label>
                     <div className="flex items-center">
                       <span className="bg-gray-100 text-gray-500 px-3 py-2.5 rounded-l-xl border border-r-0 border-gray-200 text-xs font-mono">
@@ -520,20 +525,22 @@ export default function ApplicationFormModal({
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {lang === 'hi' ? 'αñ░αñ╛αñ£αÑìαñ» (State)' : 'State'}
+                      {lang === 'hi' ? 'राज्य (State)' : 'State'}
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={state}
                       onChange={(e) => setState(e.target.value)}
-                      placeholder="e.g. Madhya Pradesh"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium text-gray-900 bg-slate-50/50"
-                    />
+                    >
+                      {INDIAN_STATES.filter(s => s !== 'All States').map((st, idx) => (
+                        <option key={idx} value={st}>{st}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {lang === 'hi' ? 'αñ£αñ┐αñ▓αñ╛ (District)' : 'District'}
+                      {lang === 'hi' ? 'जिला (District)' : 'District'}
                     </label>
                     <input
                       type="text"
@@ -547,13 +554,13 @@ export default function ApplicationFormModal({
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    {lang === 'hi' ? 'αñ╕αÑìαñÑαñ╛αñ»αÑÇ αñ¬αññαñ╛ (Residential Address)' : 'Address'}
+                    {lang === 'hi' ? 'स्थायी पता (Residential Address)' : 'Address'}
                   </label>
                   <textarea
                     rows={2}
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder={lang === 'hi' ? 'αñùαÑìαñ░αñ╛αñ«, αñíαñ╛αñòαñÿαñ░, αññαñ╣αñ╕αÑÇαñ▓...' : 'Village, Post office, Tehsil...'}
+                    placeholder={lang === 'hi' ? 'ग्राम, डाकघर, तहसील...' : 'Village, Post office, Tehsil...'}
                     className="w-full px-3.5 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium text-gray-900 bg-slate-50/50"
                   />
                 </div>
@@ -564,12 +571,12 @@ export default function ApplicationFormModal({
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-extrabold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
                     <Phone size={14} className="text-emerald-700" />
-                    {lang === 'hi' ? '2. αñ╡αÑìαñ╣αñ╛αñƒαÑìαñ╕αñÅαñ¬ αñ╕αññαÑìαñ»αñ╛αñ¬αñ¿ (WhatsApp OTP Verification)' : '2. WhatsApp OTP Verification'}
+                    {lang === 'hi' ? '2. व्हाट्सएप सत्यापन (WhatsApp OTP Verification)' : '2. WhatsApp OTP Verification'}
                   </h4>
                   {isPhoneVerified && (
                     <span className="bg-emerald-500 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                       <ShieldCheck size={13} />
-                      {lang === 'hi' ? 'αñ╕αññαÑìαñ»αñ╛αñ¬αñ┐αññ' : 'Verified'}
+                      {lang === 'hi' ? 'सत्यापित' : 'Verified'}
                     </span>
                   )}
                 </div>
@@ -577,7 +584,7 @@ export default function ApplicationFormModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {lang === 'hi' ? 'αñ╡αÑìαñ╣αñ╛αñƒαÑìαñ╕αñÅαñ¬ αñ«αÑïαñ¼αñ╛αñçαñ▓ αñ¿αñéαñ¼αñ░ *' : 'WhatsApp Mobile Number *'}
+                      {lang === 'hi' ? 'व्हाट्सएप मोबाइल नंबर *' : 'WhatsApp Mobile Number *'}
                     </label>
                     <div className="flex">
                       <span className="bg-emerald-100/70 text-emerald-800 px-3 py-2.5 rounded-l-xl border border-r-0 border-emerald-300 font-bold text-xs flex items-center">
@@ -610,14 +617,14 @@ export default function ApplicationFormModal({
                         )}
                         <span>
                           {otpTimer > 0 
-                            ? `${lang === 'hi' ? 'αñ¬αÑüαñ¿αñâ αñ¡αÑçαñ£αÑçαñé' : 'Resend in'} (${otpTimer}s)` 
-                            : (lang === 'hi' ? 'αñ╡αÑìαñ╣αñ╛αñƒαÑìαñ╕αñÅαñ¬ OTP αñ¡αÑçαñ£αÑçαñé' : 'Send WhatsApp OTP')}
+                            ? `${lang === 'hi' ? 'पुनः भेजें' : 'Resend in'} (${otpTimer}s)` 
+                            : (lang === 'hi' ? 'व्हाट्सएप OTP भेजें' : 'Send WhatsApp OTP')}
                         </span>
                       </button>
                     ) : (
                       <div className="text-emerald-700 text-xs font-bold flex items-center gap-1.5 py-2.5">
                         <CheckCircle2 size={16} />
-                        <span>{lang === 'hi' ? 'αñ«αÑïαñ¼αñ╛αñçαñ▓ αñ¿αñéαñ¼αñ░ αñ╕αññαÑìαñ»αñ╛αñ¬αñ┐αññ αñ╣αÑï αñùαñ»αñ╛ αñ╣αÑê' : 'Phone Verified via WhatsApp'}</span>
+                        <span>{lang === 'hi' ? 'मोबाइल नंबर सत्यापित हो गया है' : 'Phone Verified via WhatsApp'}</span>
                       </div>
                     )}
                   </div>
@@ -628,7 +635,7 @@ export default function ApplicationFormModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-emerald-200/50">
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        {lang === 'hi' ? '6-αñàαñéαñòαÑÇαñ» OTP αñòαÑïαñí αñªαñ░αÑìαñ£ αñòαñ░αÑçαñé' : 'Enter 6-Digit WhatsApp OTP'}
+                        {lang === 'hi' ? '6-अंकीय OTP कोड दर्ज करें' : 'Enter 6-Digit WhatsApp OTP'}
                       </label>
                       <input
                         type="text"
@@ -651,66 +658,51 @@ export default function ApplicationFormModal({
                         ) : (
                           <ShieldCheck size={14} />
                         )}
-                        <span>{lang === 'hi' ? 'OTP αñ╕αññαÑìαñ»αñ╛αñ¬αñ┐αññ αñòαñ░αÑçαñé' : 'Verify Code'}</span>
+                        <span>{lang === 'hi' ? 'OTP सत्यापित करें' : 'Verify Code'}</span>
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* Status Messages */}
+                {/* OTP Feedback Messages */}
                 {otpError && (
-                  <p className="text-xs text-red-600 font-bold flex items-center gap-1">
-                    <AlertCircle size={13} /> {otpError}
-                  </p>
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                    <AlertCircle size={14} />
+                    <span>{otpError}</span>
+                  </div>
                 )}
                 {otpSuccess && (
-                  <p className="text-xs text-emerald-700 font-bold flex items-center gap-1">
-                    <CheckCircle2 size={13} /> {otpSuccess}
-                  </p>
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-600" />
+                    <span>{otpSuccess}</span>
+                  </div>
                 )}
               </div>
 
-              {/* Error Banner */}
+              {/* Error Message */}
               {errorMessage && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2">
                   <AlertCircle size={16} />
                   <span>{errorMessage}</span>
                 </div>
               )}
 
-              {/* Form Action Footer */}
-              <div className="pt-2 flex gap-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-5 py-3 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 font-bold text-xs transition-all"
-                >
-                  {lang === 'hi' ? 'αñ░αñªαÑìαñª αñòαñ░αÑçαñé' : 'Cancel'}
-                </button>
-
+              {/* Submit & Generate Button */}
+              <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={!isPhoneVerified || isSubmitting}
-                  className={`flex-1 font-bold py-3 px-5 rounded-xl shadow-lg text-xs flex items-center justify-center gap-2 transition-all transform active:scale-95 ${
-                    !isPhoneVerified
-                      ? 'bg-slate-300 text-slate-600 border border-slate-300/80 cursor-not-allowed opacity-85'
-                      : 'bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-orange-500/20 hover:shadow-xl cursor-pointer'
-                  } disabled:opacity-75`}
+                  disabled={isSubmitting}
+                  className="w-full bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 hover:from-orange-700 hover:to-amber-600 text-white font-extrabold py-4 px-6 rounded-2xl shadow-xl hover:shadow-2xl flex items-center justify-center gap-2 text-sm transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
-                       <span>{lang === 'hi' ? 'αñ½αÑëαñ░αÑìαñ« αññαÑêαñ»αñ╛αñ░ αñ╣αÑï αñ░αñ╣αñ╛ αñ╣αÑê (n8n Engine)...' : 'Generating Form (n8n Engine)...'}</span>
-                    </>
-                  ) : !isPhoneVerified ? (
-                    <>
-                      <Lock size={15} className="text-slate-500" />
-                      <span>{lang === 'hi' ? 'αñ╡αÑìαñ╣αñ╛αñƒαÑìαñ╕αñÅαñ¬ OTP αñ╕αññαÑìαñ»αñ╛αñ¬αñ┐αññ αñòαñ░αÑçαñé (αñ½αÑëαñ░αÑìαñ« αñ▓αÑëαñò αñ╣αÑê)' : 'Verify WhatsApp OTP to Unlock Form'}</span>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>{lang === 'hi' ? 'फॉर्म तैयार हो रहा है (n8n Engine)...' : 'Generating Form (n8n Engine)...'}</span>
                     </>
                   ) : (
                     <>
-                      <FileText size={15} />
-                      <span>{lang === 'hi' ? 'αñåαñ╡αÑçαñªαñ¿ αñ½αÑëαñ░αÑìαñ« αñ¡αñ░αÑçαñé αñöαñ░ αñíαñ╛αñëαñ¿αñ▓αÑïαñí αñòαñ░αÑçαñé' : 'Generate & Download Application Form'}</span>
+                      <FileText size={18} />
+                      <span>{lang === 'hi' ? 'आवेदन फॉर्म जनरेट और डाउनलोड करें' : 'Generate & Download Application Form'}</span>
                     </>
                   )}
                 </button>
@@ -720,6 +712,7 @@ export default function ApplicationFormModal({
           )}
 
         </div>
+
       </div>
     </div>
   );
