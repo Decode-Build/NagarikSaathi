@@ -136,4 +136,29 @@ const UserSchema = new mongoose.Schema({
 
 export const User = mongoose.model('User', UserSchema);
 
+const ApplicationSchema = new mongoose.Schema({
+  applicationId: { type: String, required: true, unique: true },
+  schemeId: { type: String },
+  schemeName: { type: String, required: true },
+  applicant: {
+    fullName: { type: String, required: true },
+    phone: { type: String, required: true },
+    aadhaarLast4: { type: String },
+    gender: { type: String },
+    age: { type: Number },
+    annualIncome: { type: Number },
+    occupation: { type: String },
+    address: { type: String },
+    district: { type: String },
+    state: { type: String },
+    casteCategory: { type: String },
+    isPhoneVerified: { type: Boolean, default: true }
+  },
+  verificationToken: { type: String },
+  status: { type: String, enum: ['SUBMITTED', 'VERIFIED', 'PROCESSED', 'REJECTED'], default: 'SUBMITTED' },
+  downloadUrl: { type: String },
+  n8nGenerated: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
 
+export const Application = mongoose.model('Application', ApplicationSchema);

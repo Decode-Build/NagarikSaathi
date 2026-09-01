@@ -3,9 +3,35 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, FileText, Search, Activity, ArrowLeft, CheckCircle2, 
   RefreshCw, Cpu, Database, Award, BarChart3, Clock,
-  Check, X, AlertTriangle, FilePlus2, ShieldAlert, Send, Upload, Lock, KeyRound
+  Check, X, AlertTriangle, FilePlus2, ShieldAlert, Send, Upload, Lock, KeyRound,
+  Eye, Printer, Download, ExternalLink, ShieldCheck, FileCheck, Phone
 } from 'lucide-react';
 import Link from 'next/link';
+
+interface BeneficiaryApp {
+  _id: string;
+  applicationId: string;
+  schemeId?: string;
+  schemeName: string;
+  applicant: {
+    fullName: string;
+    phone: string;
+    aadhaarLast4?: string;
+    gender?: string;
+    age?: number;
+    annualIncome?: number;
+    occupation?: string;
+    address?: string;
+    district?: string;
+    state?: string;
+    casteCategory?: string;
+    isPhoneVerified: boolean;
+  };
+  status: string;
+  downloadUrl?: string;
+  n8nGenerated?: boolean;
+  createdAt: string;
+}
 
 interface StatsData {
   citizensHelped: number;
@@ -199,13 +225,36 @@ export default function AdminDashboard() {
     }
   };
 
+  // Beneficiary Applications State
+  const [applications, setApplications] = useState<BeneficiaryApp[]>([]);
+  const [selectedApp, setSelectedApp] = useState<BeneficiaryApp | null>(null);
+  const [appSearchTerm, setAppSearchTerm] = useState('');
+  const [isLoadingApps, setIsLoadingApps] = useState(false);
+
+  const fetchApplications = async () => {
+    setIsLoadingApps(true);
+    try {
+      const res = await fetch(`${API_URL}/integrations/applications`);
+      if (res.ok) {
+        const data = await res.json();
+        setApplications(data.applications || []);
+      }
+    } catch (err) {
+      console.warn("Could not fetch submitted applications:", err);
+    } finally {
+      setIsLoadingApps(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchLiveStats();
       fetchPendingRules();
+      fetchApplications();
       const interval = setInterval(() => {
         fetchLiveStats();
         fetchPendingRules();
+        fetchApplications();
       }, 15000);
       return () => clearInterval(interval);
     }
@@ -623,6 +672,277 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Beneficiary Applications Section */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
+          <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <FileCheck className="text-emerald-600" size={20} />
+                <span>Beneficiary Applications / भरे गए आवेदन फॉर्म</span>
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Live registry of all citizen applications submitted and verified via WhatsApp OTP & n8n Form Engine.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={appSearchTerm}
+                  onChange={(e) => setAppSearchTerm(e.target.value)}
+                  placeholder="Search by name, phone, scheme..."
+                  className="bg-gray-50 border border-gray-200 rounded-xl py-1.5 pl-8 pr-3 text-xs text-gray-800 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-200 w-56 transition-all"
+                />
+              </div>
+
+              <button
+                onClick={fetchApplications}
+                disabled={isLoadingApps}
+                className="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs px-2.5 py-1.5 rounded-xl font-bold transition-all"
+                title="Refresh Applications"
+              >
+                <RefreshCw size={12} className={isLoadingApps ? "animate-spin" : ""} />
+                <span>Refresh</span>
+              </button>
+
+              <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full text-xs font-bold shadow-xs whitespace-nowrap">
+                {applications.length} Total Forms
+              </span>
+            </div>
+          </div>
+
+          {/* Applications Table */}
+          <div className="overflow-x-auto rounded-xl border border-gray-100">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-100/70 text-gray-600 uppercase font-bold text-[11px]">
+                <tr>
+                  <th className="px-4 py-3">App Ref ID</th>
+                  <th className="px-4 py-3">Beneficiary Name</th>
+                  <th className="px-4 py-3">WhatsApp Number</th>
+                  <th className="px-4 py-3">Scheme Name</th>
+                  <th className="px-4 py-3">District / State</th>
+                  <th className="px-4 py-3">Income / Cat</th>
+                  <th className="px-4 py-3">Submitted</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-gray-800">
+                {applications
+                  .filter(app => {
+                    if (!appSearchTerm.trim()) return true;
+                    const term = appSearchTerm.toLowerCase();
+                    return (
+                      app.applicationId?.toLowerCase().includes(term) ||
+                      app.applicant?.fullName?.toLowerCase().includes(term) ||
+                      app.applicant?.phone?.includes(term) ||
+                      app.schemeName?.toLowerCase().includes(term) ||
+                      app.applicant?.district?.toLowerCase().includes(term) ||
+                      app.applicant?.state?.toLowerCase().includes(term)
+                    );
+                  })
+                  .map((app) => (
+                    <tr key={app._id || app.applicationId} className="hover:bg-orange-50/30 transition-colors">
+                      <td className="px-4 py-3.5 font-mono font-bold text-orange-700">
+                        {app.applicationId}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="font-bold text-gray-900">{app.applicant?.fullName || 'N/A'}</div>
+                        <div className="text-[10px] text-gray-500 font-medium">
+                          {app.applicant?.age ? `${app.applicant.age} Yrs` : ''} {app.applicant?.gender || ''}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-1.5 font-semibold text-gray-800">
+                          <Phone size={11} className="text-gray-400" />
+                          <span>+91 {app.applicant?.phone}</span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded text-[9px] font-bold mt-0.5">
+                          <CheckCircle2 size={9} /> WhatsApp Verified
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 font-semibold text-gray-900 max-w-[180px] truncate" title={app.schemeName}>
+                        {app.schemeName}
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-600">
+                        <div>{app.applicant?.district || 'N/A'}</div>
+                        <div className="text-[10px] text-gray-400 font-medium">{app.applicant?.state || ''}</div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="font-bold text-gray-800">₹{(app.applicant?.annualIncome || 0).toLocaleString('en-IN')}</div>
+                        <div className="text-[10px] text-gray-400 font-medium">{app.applicant?.casteCategory || 'General'}</div>
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-500 text-[11px] whitespace-nowrap">
+                        {app.createdAt ? new Date(app.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recent'}
+                      </td>
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => setSelectedApp(app)}
+                          className="inline-flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer shadow-xs"
+                        >
+                          <Eye size={13} />
+                          <span>View Form</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                {applications.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="text-center py-12 text-gray-400 font-medium text-xs">
+                      <FileText size={32} className="mx-auto text-gray-300 mb-2" />
+                      <span>No beneficiary applications filled yet. Try clicking "Apply Now" on any scheme card!</span>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Application Details & Print Preview Modal */}
+        {selectedApp && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+              {/* Modal Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 text-white flex justify-between items-center">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-white/20 rounded-xl">
+                    <FileCheck size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm">Beneficiary Application Details</h3>
+                    <p className="text-[11px] text-orange-100 font-mono">Ref ID: {selectedApp.applicationId}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedApp(null)}
+                  className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-full transition-all"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto space-y-5 text-xs text-gray-800">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold">
+                    <ShieldCheck size={18} className="text-emerald-600" />
+                    <span>WhatsApp OTP Verified Submission</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 font-medium">
+                    {new Date(selectedApp.createdAt).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                {/* Target Scheme */}
+                <div className="bg-gray-50 border border-gray-200/80 rounded-xl p-4 space-y-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Target Welfare Scheme</span>
+                  <h4 className="text-sm font-black text-gray-900">{selectedApp.schemeName}</h4>
+                </div>
+
+                {/* Beneficiary Demographics Grid */}
+                <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Beneficiary Demographics</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="bg-gray-50 p-2.5 rounded-lg">
+                      <span className="text-gray-400 block text-[10px]">Full Name</span>
+                      <span className="font-bold text-gray-900">{selectedApp.applicant?.fullName}</span>
+                    </div>
+                    <div className="bg-gray-50 p-2.5 rounded-lg">
+                      <span className="text-gray-400 block text-[10px]">WhatsApp Mobile</span>
+                      <span className="font-bold text-gray-900">+91 {selectedApp.applicant?.phone}</span>
+                    </div>
+                    <div className="bg-gray-50 p-2.5 rounded-lg">
+                      <span className="text-gray-400 block text-[10px]">Age / Gender</span>
+                      <span className="font-bold text-gray-900">{selectedApp.applicant?.age || 'N/A'} Yrs / {selectedApp.applicant?.gender || 'N/A'}</span>
+                    </div>
+                    <div className="bg-gray-50 p-2.5 rounded-lg">
+                      <span className="text-gray-400 block text-[10px]">Caste Category</span>
+                      <span className="font-bold text-gray-900">{selectedApp.applicant?.casteCategory || 'General'}</span>
+                    </div>
+                    <div className="bg-gray-50 p-2.5 rounded-lg">
+                      <span className="text-gray-400 block text-[10px]">Occupation</span>
+                      <span className="font-bold text-gray-900">{selectedApp.applicant?.occupation || 'N/A'}</span>
+                    </div>
+                    <div className="bg-gray-50 p-2.5 rounded-lg">
+                      <span className="text-gray-400 block text-[10px]">Annual Family Income</span>
+                      <span className="font-bold text-emerald-700">₹{(selectedApp.applicant?.annualIncome || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="bg-gray-50 p-2.5 rounded-lg">
+                      <span className="text-gray-400 block text-[10px]">Aadhaar (Last 4)</span>
+                      <span className="font-bold text-gray-900">XXXX-XXXX-{selectedApp.applicant?.aadhaarLast4 || 'XXXX'}</span>
+                    </div>
+                    <div className="bg-gray-50 p-2.5 rounded-lg sm:col-span-2">
+                      <span className="text-gray-400 block text-[10px]">District & State</span>
+                      <span className="font-bold text-gray-900">{selectedApp.applicant?.district || 'N/A'}, {selectedApp.applicant?.state || 'N/A'}</span>
+                    </div>
+                    <div className="bg-gray-50 p-2.5 rounded-lg col-span-2 sm:col-span-3">
+                      <span className="text-gray-400 block text-[10px]">Address</span>
+                      <span className="font-bold text-gray-900">{selectedApp.applicant?.address || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                <button
+                  onClick={() => setSelectedApp(null)}
+                  className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 font-bold text-xs transition-all"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      printWindow.document.write(`
+                        <html>
+                          <head>
+                            <title>Application - ${selectedApp.applicationId}</title>
+                            <style>
+                              body { font-family: sans-serif; padding: 30px; color: #1e293b; }
+                              .header { border-bottom: 2px solid #ea580c; padding-bottom: 15px; margin-bottom: 20px; }
+                              .title { font-size: 20px; font-weight: bold; color: #c2410c; }
+                              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
+                              .field-label { color: #64748b; font-size: 12px; }
+                              .field-value { font-weight: bold; font-size: 14px; }
+                            </style>
+                          </head>
+                          <body>
+                            <div class="header">
+                              <div class="title">🏛️ NagarikSaathi - Scheme Application Form</div>
+                              <div>Application ID: ${selectedApp.applicationId} | Scheme: ${selectedApp.schemeName}</div>
+                            </div>
+                            <div class="grid">
+                              <div><div class="field-label">Applicant Name</div><div class="field-value">${selectedApp.applicant?.fullName}</div></div>
+                              <div><div class="field-label">WhatsApp Mobile</div><div class="field-value">+91 ${selectedApp.applicant?.phone} (Verified)</div></div>
+                              <div><div class="field-label">Age & Gender</div><div class="field-value">${selectedApp.applicant?.age} Yrs / ${selectedApp.applicant?.gender}</div></div>
+                              <div><div class="field-label">Category & Occupation</div><div class="field-value">${selectedApp.applicant?.casteCategory} / ${selectedApp.applicant?.occupation}</div></div>
+                              <div><div class="field-label">Annual Income</div><div class="field-value">₹${selectedApp.applicant?.annualIncome}</div></div>
+                              <div><div class="field-label">Aadhaar (Last 4)</div><div class="field-value">XXXX-XXXX-${selectedApp.applicant?.aadhaarLast4}</div></div>
+                              <div><div class="field-label">Location</div><div class="field-value">${selectedApp.applicant?.district}, ${selectedApp.applicant?.state}</div></div>
+                              <div><div class="field-label">Address</div><div class="field-value">${selectedApp.applicant?.address}</div></div>
+                            </div>
+                          </body>
+                        </html>
+                      `);
+                      printWindow.document.close();
+                      printWindow.focus();
+                      printWindow.print();
+                    }
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold text-xs rounded-xl shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all"
+                >
+                  <Printer size={13} />
+                  <span>Print Application Packet</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 2-Column Section: Recent Activity Table + Diagnostics */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

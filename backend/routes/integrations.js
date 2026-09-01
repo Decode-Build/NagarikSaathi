@@ -1,4 +1,5 @@
 import express from 'express';
+import { Application } from '../models.js';
 
 const router = express.Router();
 
@@ -47,21 +48,39 @@ router.post('/whatsapp-share', async (req, res) => {
 
     const phoneInfo = normalizePhone(phone);
     const n8nWebhookUrl = process.env.N8N_WHATSAPP_SHARE_WEBHOOK;
+    const schemeName = scheme.name || scheme.schemeName || scheme.title || 'Government Scheme';
+    const overview = scheme.overview || scheme.description || '';
+    const benefitsList = (scheme.benefits || []).slice(0, 3).map(b => `• ${b}`).join('\n');
+    const documentsList = (scheme.documents || []).slice(0, 4).map(d => `• ${d}`).join('\n');
+
+    const formattedMessage = `🏛️ *${schemeName}*\n\n📝 *${language === 'hi' ? 'विवरण' : 'Overview'}:*\n${overview}\n\n🎁 *${language === 'hi' ? 'मुख्य लाभ' : 'Key Benefits'}:*\n${benefitsList || 'Available on official portal'}\n\n📄 *${language === 'hi' ? 'दस्तावेज़' : 'Documents'}:*\n${documentsList || 'Aadhaar Card, Bank Details'}\n\n🌐 *${language === 'hi' ? 'पोर्टल' : 'Portal'}:* ${scheme.portalUrl || 'https://www.india.gov.in'}\n📞 *${language === 'hi' ? 'हेल्पलाइन' : 'Helpline'}:* ${scheme.helpline || '1800-111-999'}`;
 
     const payload = {
       phone: phoneInfo.countryCode,
+      phone_number: phoneInfo.countryCode,
       phone10: phoneInfo.raw10,
       to: phoneInfo.countryCode,
       recipient: phoneInfo.countryCode,
       whatsappNumber: phoneInfo.plusCountryCode,
+      scheme: schemeName,
+      scheme_name: schemeName,
+      schemeName: schemeName,
+      schemeTitle: schemeName,
+      title: schemeName,
+      name: schemeName,
       schemeId: scheme.id || scheme._id,
-      schemeName: scheme.name,
-      overview: scheme.overview,
+      scheme_id: scheme.id || scheme._id,
+      overview: overview,
+      description: overview,
       benefits: scheme.benefits || [],
       documents: scheme.documents || [],
       portalUrl: scheme.portalUrl || '',
+      portal_url: scheme.portalUrl || '',
       helpline: scheme.helpline || '',
       language: language,
+      message: formattedMessage,
+      text: formattedMessage,
+      body: formattedMessage,
       timestamp: new Date().toISOString()
     };
 
@@ -167,7 +186,7 @@ router.post('/send-otp', async (req, res) => {
         console.error('Error sending OTP to n8n webhook:', err.message);
       }
     } else {
-      console.log(`[Dev OTP] Generated OTP for WhatsApp ${cleanPhone}: ${generatedOtp}`);
+      console.log(`[Dev OTP] Generated OTP for WhatsApp ${phoneInfo.raw10}: ${generatedOtp}`);
     }
 
     return res.json({
@@ -275,14 +294,44 @@ router.post('/submit-application', async (req, res) => {
     const verifiedRecord = cleanPhone ? otpStore.get(cleanPhone) : null;
     const isPhoneVerified = verifiedRecord ? verifiedRecord.verified : Boolean(verificationToken);
 
+    // Strict Security Guard: Enforce OTP verification before allowing form generation
+    if (!isPhoneVerified) {
+      return res.status(403).json({
+        error: 'WhatsApp OTP verification is mandatory before generating or downloading the application form.'
+      });
+    }
+
     const applicationId = `NS-APP-${Date.now().toString(36).toUpperCase()}`;
     const submissionPayload = {
       applicationId,
+      application_id: applicationId,
       schemeId,
+      scheme_id: schemeId,
       schemeName,
+      scheme_name: schemeName,
+      fullName: applicant.fullName || '',
+      name: applicant.fullName || '',
+      applicantName: applicant.fullName || '',
+      phone: cleanPhone,
+      phone_number: cleanPhone,
+      whatsappNumber: '+91' + cleanPhone,
+      aadhaarLast4: applicant.aadhaarLast4 || '',
+      aadhaar: applicant.aadhaarLast4 || '',
+      gender: applicant.gender || '',
+      age: Number(applicant.age) || null,
+      annualIncome: Number(applicant.annualIncome) || 0,
+      annual_income: Number(applicant.annualIncome) || 0,
+      occupation: applicant.occupation || '',
+      address: applicant.address || '',
+      district: applicant.district || '',
+      state: applicant.state || '',
+      casteCategory: applicant.category || applicant.casteCategory || 'General',
+      isPhoneVerified: true,
       applicant: {
         fullName: applicant.fullName || '',
+        name: applicant.fullName || '',
         phone: cleanPhone,
+        phone_number: cleanPhone,
         aadhaarLast4: applicant.aadhaarLast4 || '',
         gender: applicant.gender || '',
         age: Number(applicant.age) || null,
@@ -292,10 +341,25 @@ router.post('/submit-application', async (req, res) => {
         district: applicant.district || '',
         state: applicant.state || '',
         casteCategory: applicant.category || applicant.casteCategory || 'General',
-        isPhoneVerified
+        isPhoneVerified: true
       },
       submittedAt: new Date().toISOString()
     };
+
+    // Persist application in MongoDB so it is visible in Admin Panel
+    try {
+      await Application.create({
+        applicationId,
+        schemeId: schemeId || 'general',
+        schemeName,
+        applicant: submissionPayload.applicant,
+        verificationToken: verificationToken || (verifiedRecord ? verifiedRecord.token : 'verified'),
+        status: 'SUBMITTED',
+        n8nGenerated: Boolean(process.env.N8N_FORM_AUTOFILL_WEBHOOK)
+      });
+    } catch (dbSaveErr) {
+      console.warn('Could not save application to DB:', dbSaveErr.message);
+    }
 
     const n8nWebhookUrl = process.env.N8N_FORM_AUTOFILL_WEBHOOK;
 
@@ -348,6 +412,24 @@ router.post('/submit-application', async (req, res) => {
   } catch (err) {
     console.error('Error in /submit-application:', err);
     res.status(500).json({ error: 'Failed to submit application form.' });
+  }
+});
+
+/**
+ * 5. GET /api/integrations/applications
+ * Returns all filled applications for the Admin Panel
+ */
+router.get('/applications', async (req, res) => {
+  try {
+    const applications = await Application.find({}).sort({ createdAt: -1 }).limit(200);
+    return res.json({
+      success: true,
+      count: applications.length,
+      applications
+    });
+  } catch (err) {
+    console.error('Error fetching applications for admin:', err);
+    return res.status(500).json({ error: 'Failed to fetch applications.' });
   }
 });
 
