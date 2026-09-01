@@ -169,17 +169,6 @@ export default function DetailScreen({
             </div>
 
             <div className="space-y-3 text-xs">
-              {/* Dynamic QR Code for Handouts */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded flex flex-col items-center gap-2 text-center">
-                <span className="text-[10px] text-amber-700 font-bold uppercase tracking-widest font-mono">{t.scanToApply || 'Scan to Apply'}</span>
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=${encodeURIComponent(selectedScheme.applicationUrl || 'https://www.india.gov.in')}&color=0f172a&bgcolor=ffffff`}
-                  alt="Scheme QR Link"
-                  className="w-24 h-24 rounded border border-slate-200 shadow-xs p-1 bg-white"
-                />
-                <span className="text-[9px] text-slate-500 font-mono font-medium">Scan code to open portal</span>
-              </div>
-
               <div className="p-4 bg-slate-50 border border-slate-200 rounded space-y-2">
                 <div className="flex items-center gap-2 text-slate-700 font-bold">
                   <Phone className="w-4 h-4 text-green-600" />

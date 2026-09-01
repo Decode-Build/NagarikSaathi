@@ -1,21 +1,16 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, List, MessageSquare, LayoutDashboard, HelpCircle, X, FileText, CheckSquare, Target, Settings, Globe, PlayCircle } from 'lucide-react';
+import { Home, List, MessageSquare, LayoutDashboard, HelpCircle, X, FileText, Target, Settings, PlayCircle } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export default function Sidebar({ isOpen, toggleSidebar }) {
-  const { t, lang, setLang } = useLanguage();
-
-  const toggleLanguage = () => {
-    setLang(lang === 'en' ? 'hi' : 'en');
-  };
+  const { t } = useLanguage();
 
   const navItems = [
     { path: '/admin', icon: <LayoutDashboard size={20} />, label: t.adminPanel || 'Dashboard' },
     { path: '/', icon: <Home size={20} />, label: t.home || 'Home' },
     { path: '/schemes', icon: <List size={20} />, label: t.allSchemes || 'Schemes' },
     { path: '/documents', icon: <FileText size={20} />, label: t.documents || 'Documents' },
-    { path: '/applications', icon: <CheckSquare size={20} />, label: t.applications || 'Applications' },
     { path: '/tracking', icon: <Target size={20} />, label: t.tracking || 'Tracking' },
     { path: '/chat', icon: <MessageSquare size={20} />, label: t.aiSaathi || 'AI Saathi' },
     { path: '/screener', icon: <Settings size={20} />, label: 'Filters' },
@@ -66,14 +61,6 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
               <span>{item.label}</span>
             </NavLink>
           ))}
-          
-          <button
-            onClick={toggleLanguage}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-          >
-            <Globe size={20} />
-            <span>Hindi / English</span>
-          </button>
           
           <NavLink
             to="/how-it-works"
