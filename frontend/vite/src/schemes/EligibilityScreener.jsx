@@ -1,6 +1,6 @@
 import React from 'react';
 import { INDIAN_STATES, OCCUPATIONS } from '../utils/constants.js';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function EligibilityScreener({ profile, setProfile, handleRunScreener, setPage, screenerLoading }) {
   const { t, lang: langMode } = useLanguage();

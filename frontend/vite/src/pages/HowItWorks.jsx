@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight, Search, List, MessageSquare, Printer, CheckCircle } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function HowItWorks() {
   const { lang } = useLanguage();

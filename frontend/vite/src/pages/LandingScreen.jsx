@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users, MessageSquare, FileCheck, Layers, UserCheck, Printer, Award, User, ArrowLeft, Search, Sparkles } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../i18n/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function LandingScreen({ initChatSession, handleSendMessage }) {

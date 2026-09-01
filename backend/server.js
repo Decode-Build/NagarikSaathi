@@ -22,6 +22,13 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
 const app = express();
 app.use(helmet());
 const allowedOrigins = process.env.CORS_ORIGIN 
@@ -42,10 +49,14 @@ if (!JWT_SECRET) {
 
 import authRoutes, { requireAuth, getUserFromHeader } from './routes/auth.js';
 import schemeRoutes from './routes/schemes.js';
+import integrationsRoutes from './routes/integrations.js';
+import documentsRoutes from './routes/documents.js';
 
 // Setup Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', schemeRoutes);
+app.use('/api/integrations', integrationsRoutes);
+app.use('/api/documents', documentsRoutes);
 
 // Initialize Gemini LLM
 let model = null;
@@ -310,7 +321,8 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
               if (scheme.embedding && scheme.embedding.length > 0) {
                 score = cosineSimilarity(queryVector, scheme.embedding);
               }
-              return { ...scheme.toObject(), score };
+              const obj = typeof scheme.toObject === 'function' ? scheme.toObject() : scheme;
+              return { ...obj, score };
             });
             scoredSchemes.forEach(s => {
               scoredSchemesMap[s.schemeId] = s.score;
@@ -1132,7 +1144,7 @@ app.get('*', (req, res) => {
 
 // Start Express Server
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.PORT || 5001;
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });

@@ -1,8 +1,8 @@
-import React from 'react';
-import { ArrowLeft, Volume2, Printer, AlertTriangle, CreditCard, CheckSquare, Phone, ExternalLink, MessageCircle } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
-
+import React, { useState } from 'react';
+import { ArrowLeft, Volume2, Printer, AlertTriangle, CreditCard, CheckSquare, Phone, ExternalLink, MessageCircle, FileText } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 import { useNavigate } from 'react-router-dom';
+import ApplicationFormModal from '../documents/ApplicationFormModal';
 
 export default function DetailScreen({ 
   selectedScheme, chatSources, handleSpeechOutput, 
@@ -10,6 +10,7 @@ export default function DetailScreen({
 }) {
   const { t, lang: langMode } = useLanguage();
   const navigate = useNavigate();
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   return (
     <div className="space-y-8 animate-fade-in relative">
@@ -86,7 +87,7 @@ export default function DetailScreen({
         
         <div className="border-b border-slate-100 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <span className="text-xs font-bold text-amber-650 uppercase tracking-widest font-mono">NagarikSaathi Application Guide</span>
+            <span className="text-xs font-bold text-amber-650 uppercase tracking-widest font-mono">{t.appGuide || 'NagarikSaathi Application Guide'}</span>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">{langMode === 'hi' ? selectedScheme.nameHindi : selectedScheme.name}</h1>
             <p className="text-xs text-slate-450 font-semibold">{selectedScheme.ministry}</p>
           </div>
@@ -108,7 +109,7 @@ export default function DetailScreen({
           <div className="md:col-span-2 space-y-6">
             {/* Summary */}
             <div className="space-y-2">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1.5">Scheme Details / योजना विवरण</h3>
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1.5">{t.schemeDetails || 'Scheme Details'}</h3>
               <p className="text-sm text-slate-600 leading-relaxed font-medium">
                 {langMode === 'hi' ? selectedScheme.descriptionHindi : selectedScheme.description}
               </p>
@@ -118,7 +119,7 @@ export default function DetailScreen({
             <div className="space-y-2">
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1.5 flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-green-600" />
-                Benefits Provided / योजना के लाभ
+                {t.benefitsProvided || 'Benefits Provided'}
               </h3>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded">
                 <p className="text-sm text-slate-900 font-bold">
@@ -129,14 +130,14 @@ export default function DetailScreen({
 
             {/* Eligibility parameters */}
             <div className="space-y-2">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1.5">Eligibility Rules / पात्रता शर्तें</h3>
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-1.5">{t.eligibilityRules || 'Eligibility Rules'}</h3>
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-150">
-                  <span className="text-slate-500 block mb-1 font-semibold uppercase tracking-wider text-[10px]">Occupation</span>
+                  <span className="text-slate-500 block mb-1 font-semibold uppercase tracking-wider text-[10px]">{t.occLabel || 'Occupation'}</span>
                   <span className="text-slate-800 text-sm font-bold">{selectedScheme.eligibility.occupation.join(', ')}</span>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-150">
-                  <span className="text-slate-500 block mb-1 font-semibold uppercase tracking-wider text-[10px]">States</span>
+                  <span className="text-slate-500 block mb-1 font-semibold uppercase tracking-wider text-[10px]">{t.stateLabel || 'State'}</span>
                   <span className="text-slate-800 text-sm font-bold">{selectedScheme.eligibility.states.join(', ')}</span>
                 </div>
               </div>
@@ -165,7 +166,7 @@ export default function DetailScreen({
             <div className="space-y-3 text-xs">
               {/* Dynamic QR Code for Handouts */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded flex flex-col items-center gap-2 text-center">
-                <span className="text-[10px] text-amber-700 font-bold uppercase tracking-widest font-mono">Scan to Apply / स्कैन करें</span>
+                <span className="text-[10px] text-amber-700 font-bold uppercase tracking-widest font-mono">{t.scanToApply || 'Scan to Apply'}</span>
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=${encodeURIComponent(selectedScheme.applicationUrl || 'https://www.india.gov.in')}&color=0f172a&bgcolor=ffffff`}
                   alt="Scheme QR Link"
@@ -177,9 +178,17 @@ export default function DetailScreen({
               <div className="p-4 bg-slate-50 border border-slate-200 rounded space-y-2">
                 <div className="flex items-center gap-2 text-slate-700 font-bold">
                   <Phone className="w-4 h-4 text-green-600" />
-                  <span>Helpline: {selectedScheme.helplineNumber || '14545'}</span>
+                  <span>{t.helpline || 'Helpline'}: {selectedScheme.helplineNumber || '14545'}</span>
                 </div>
               </div>
+
+              <button
+                onClick={() => setIsFormOpen(true)}
+                className="no-print w-full py-3.5 rounded bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white transition-all flex items-center justify-center gap-2 font-bold shadow-md cursor-pointer"
+              >
+                <FileText className="w-4 h-4" />
+                {langMode === 'hi' ? 'ऑटो-फिल आवेदन फॉर्म भरें' : 'Auto-Fill Application Form'}
+              </button>
 
               <a 
                 href={selectedScheme.applicationUrl} 
@@ -222,10 +231,16 @@ export default function DetailScreen({
           title="Flag outdated or incorrect information"
         >
           <AlertTriangle className="w-3.5 h-3.5" />
-          <span>Information outdated? Flag for database update / जानकारी पुरानी है? रिपोर्ट करें</span>
+          <span>{t.reportScheme || 'Information outdated? Flag for database update'}</span>
         </button>
       </div>
 
+      <ApplicationFormModal 
+        scheme={selectedScheme}
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        lang={langMode}
+      />
     </div>
   );
 }
