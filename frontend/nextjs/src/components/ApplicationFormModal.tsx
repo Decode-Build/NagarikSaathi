@@ -16,7 +16,8 @@ import {
   IndianRupee, 
   AlertCircle,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Lock
 } from 'lucide-react';
 
 interface ApplicationFormModalProps {
@@ -166,6 +167,15 @@ export default function ApplicationFormModal({
   // Step 3: Trigger n8n Auto-fill Form & Download
   const handleSubmitApplication = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isPhoneVerified) {
+      setErrorMessage(
+        lang === 'hi'
+          ? '⚠️ फॉर्म डाउनलोड करने के लिए कृपया पहले ऊपर अपना व्हाट्सएप OTP सत्यापित करें।'
+          : '⚠️ Please verify your WhatsApp number with OTP above before generating the application form.'
+      );
+      return;
+    }
+
     if (!fullName.trim()) {
       setErrorMessage(lang === 'hi' ? 'कृपया अपना पूरा नाम दर्ज करें।' : 'Please enter your full name.');
       return;
@@ -689,13 +699,22 @@ export default function ApplicationFormModal({
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 px-5 rounded-xl shadow-lg hover:shadow-xl text-xs flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer disabled:opacity-75"
+                  disabled={!isPhoneVerified || isSubmitting}
+                  className={`flex-1 font-bold py-3 px-5 rounded-xl shadow-lg text-xs flex items-center justify-center gap-2 transition-all transform active:scale-95 ${
+                    !isPhoneVerified
+                      ? 'bg-slate-300 text-slate-600 border border-slate-300/80 cursor-not-allowed opacity-85'
+                      : 'bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-orange-500/20 hover:shadow-xl cursor-pointer'
+                  } disabled:opacity-75`}
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>{lang === 'hi' ? 'फॉर्म तैयार हो रहा है (n8n Engine)...' : 'Generating Form (n8n Engine)...'}</span>
+                       <span>{lang === 'hi' ? 'फॉर्म तैयार हो रहा है (n8n Engine)...' : 'Generating Form (n8n Engine)...'}</span>
+                    </>
+                  ) : !isPhoneVerified ? (
+                    <>
+                      <Lock size={15} className="text-slate-500" />
+                      <span>{lang === 'hi' ? 'व्हाट्सएप OTP सत्यापित करें (फॉर्म लॉक है)' : 'Verify WhatsApp OTP to Unlock Form'}</span>
                     </>
                   ) : (
                     <>
