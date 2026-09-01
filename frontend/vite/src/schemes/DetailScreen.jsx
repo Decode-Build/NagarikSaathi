@@ -3,6 +3,7 @@ import { ArrowLeft, Volume2, Printer, AlertTriangle, CreditCard, CheckSquare, Ph
 import { useLanguage } from '../i18n/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import ApplicationFormModal from '../documents/ApplicationFormModal';
+import WhatsAppShareModal from '../documents/WhatsAppShareModal';
 
 export default function DetailScreen({ 
   selectedScheme, chatSources, handleSpeechOutput, 
@@ -11,6 +12,7 @@ export default function DetailScreen({
   const { t, lang: langMode } = useLanguage();
   const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   return (
     <div className="space-y-8 animate-fade-in relative">
@@ -33,8 +35,13 @@ export default function DetailScreen({
         <div className="flex gap-2">
           {/* Voice Readout Button */}
           <button
-            onClick={() => handleSpeechOutput(langMode === 'hi' ? selectedScheme.descriptionHindi : selectedScheme.description)}
-            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors"
+            onClick={() => {
+              const textToSpeak = langMode === 'hi' 
+                ? (selectedScheme.descriptionHindi || selectedScheme.description || selectedScheme.nameHindi || selectedScheme.name)
+                : (selectedScheme.description || selectedScheme.descriptionHindi || selectedScheme.name);
+              handleSpeechOutput(textToSpeak);
+            }}
+            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
             aria-label={t.speakBtn}
           >
             <Volume2 className="w-4 h-4 text-green-600" />
@@ -43,20 +50,18 @@ export default function DetailScreen({
 
           <button 
             onClick={() => window.print()}
-            className="bg-green-600 hover:bg-amber-700 text-white font-bold px-5 py-2.5 rounded text-sm shadow-sm transition-colors flex items-center gap-2"
+            className="bg-green-600 hover:bg-amber-700 text-white font-bold px-5 py-2.5 rounded text-sm shadow-sm transition-colors flex items-center gap-2 cursor-pointer"
             aria-label={t.printBtn}
           >
             <Printer className="w-4 h-4" /> {t.printBtn}
           </button>
 
-          <a 
-            href={`https://wa.me/?text=Check out this government scheme: ${encodeURIComponent(langMode === 'hi' ? selectedScheme.nameHindi : selectedScheme.name)} - ${encodeURIComponent(window.location.href)}`}
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded text-sm shadow-sm transition-colors flex items-center gap-2"
+          <button 
+            onClick={() => setIsShareModalOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded text-sm shadow-sm transition-colors flex items-center gap-2 cursor-pointer"
           >
             <MessageCircle className="w-4 h-4" /> Share via WhatsApp
-          </a>
+          </button>
         </div>
       </div>
 
@@ -239,6 +244,13 @@ export default function DetailScreen({
         scheme={selectedScheme}
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
+        lang={langMode}
+      />
+
+      <WhatsAppShareModal 
+        scheme={selectedScheme}
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
         lang={langMode}
       />
     </div>
