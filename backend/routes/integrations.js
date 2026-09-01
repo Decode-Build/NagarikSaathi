@@ -20,15 +20,15 @@ setInterval(() => {
 // Normalize phone numbers for WhatsApp APIs (e.g., 9522520619 -> 919522520619 & +919522520619)
 const normalizePhone = (rawPhone) => {
   let digits = String(rawPhone || '').replace(/\D/g, '');
-  if (digits.startsWith('91') && digits.length === 12) {
-    // Already has 91 prefix
-  } else if (digits.length === 10) {
-    digits = '91' + digits;
+  if (digits.startsWith('0') && digits.length === 11) {
+    digits = digits.slice(1);
   }
+  const raw10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  const countryCode = '91' + raw10;
   return {
-    raw10: digits.length === 12 ? digits.slice(2) : digits,
-    countryCode: digits,
-    plusCountryCode: '+' + digits
+    raw10: raw10,
+    countryCode: countryCode,
+    plusCountryCode: '+' + countryCode
   };
 };
 
@@ -159,18 +159,33 @@ router.post('/send-otp', async (req, res) => {
       attempts: 0
     });
 
-    const n8nWebhookUrl = process.env.N8N_OTP_SEND_WEBHOOK;
+    const formattedOtpMessage = `🔐 *NagarikSaathi Verification Code*\n\nYour 6-digit OTP verification code is: *${generatedOtp}*\n\n⏳ Valid for 5 minutes. Do not share this code with anyone.\n\n🇮🇳 _NagarikSaathi - Government Schemes Assistance Platform_`;
+
+    const n8nWebhookUrl = process.env.N8N_OTP_SEND_WEBHOOK || process.env.N8N_WHATSAPP_SHARE_WEBHOOK;
     const payload = {
       phone: phoneInfo.countryCode,
+      phone_number: phoneInfo.countryCode,
       phone10: phoneInfo.raw10,
       to: phoneInfo.countryCode,
       recipient: phoneInfo.countryCode,
       whatsappNumber: phoneInfo.plusCountryCode,
+      scheme: 'NagarikSaathi OTP Verification',
+      scheme_name: 'NagarikSaathi OTP Verification',
+      schemeName: 'NagarikSaathi OTP Verification',
+      schemeTitle: 'NagarikSaathi OTP Verification',
+      title: 'NagarikSaathi OTP Verification',
+      name: 'NagarikSaathi OTP Verification',
       otp: generatedOtp,
+      code: generatedOtp,
+      verificationCode: generatedOtp,
       purpose,
-      message: `Your NagarikSaathi verification code is: ${generatedOtp}. Valid for 5 minutes. Do not share this code with anyone.`,
+      message: formattedOtpMessage,
+      text: formattedOtpMessage,
+      body: formattedOtpMessage,
       timestamp: new Date().toISOString()
     };
+
+    console.log(`[WhatsApp OTP] Generated verification code for ${phoneInfo.raw10}: ${generatedOtp} (Valid for 5 mins)`);
 
     if (n8nWebhookUrl) {
       try {
@@ -180,20 +195,35 @@ router.post('/send-otp', async (req, res) => {
           body: JSON.stringify(payload)
         });
 
-        if (!n8nRes.ok) {
-          console.warn('n8n OTP webhook responded with non-200 status:', n8nRes.status);
+        if (n8nRes.ok) {
+          console.log(`[WhatsApp OTP] Dispatched successfully to WhatsApp via n8n for ${phoneInfo.raw10}`);
+        } else {
+          console.warn(`n8n primary OTP webhook responded with status ${n8nRes.status}. Trying secondary WhatsApp alert webhook...`);
+          if (process.env.N8N_WHATSAPP_SHARE_WEBHOOK && process.env.N8N_WHATSAPP_SHARE_WEBHOOK !== n8nWebhookUrl) {
+            try {
+              const fallbackRes = await fetch(process.env.N8N_WHATSAPP_SHARE_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              if (fallbackRes.ok) {
+                console.log(`[WhatsApp OTP] Dispatched successfully via secondary WhatsApp webhook for ${phoneInfo.raw10}`);
+              }
+            } catch (fbErr) {
+              console.warn('Fallback webhook error:', fbErr.message);
+            }
+          }
         }
       } catch (err) {
         console.error('Error sending OTP to n8n webhook:', err.message);
       }
-    } else {
-      console.log(`[Dev OTP] Generated OTP for WhatsApp ${phoneInfo.raw10}: ${generatedOtp}`);
     }
 
     return res.json({
       success: true,
       message: 'OTP sent to your WhatsApp number.',
-      expiresInSeconds: 300
+      expiresInSeconds: 300,
+      devOtp: process.env.NODE_ENV !== 'production' ? generatedOtp : undefined
     });
   } catch (err) {
     console.error('Error in /send-otp:', err);

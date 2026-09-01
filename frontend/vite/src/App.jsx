@@ -228,27 +228,45 @@ export default function App() {
   };
 
   const handleSpeechOutput = (text) => {
+    if (!text) return;
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       
-      const cleanText = text.replace(/[*_#`~>]/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
+      const cleanText = String(text || '')
+        .replace(/[*_#`~>]/g, '')
+        .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+        .trim();
+      
+      if (!cleanText) return;
+
       const utterance = new SpeechSynthesisUtterance(cleanText);
       
-      const isHindi = /[\u0900-\u097F]/.test(cleanText);
+      const isHindi = /[\u0900-\u097F]/.test(cleanText) || langMode === 'hi';
       const targetLang = isHindi ? 'hi-IN' : 'en-IN';
       utterance.lang = targetLang;
       
       const voices = window.speechSynthesis.getVoices();
-      let voice = voices.find(v => v.lang === targetLang) || voices.find(v => v.lang.startsWith(targetLang.split('-')[0]));
-      if (voice) {
-        utterance.voice = voice;
+      if (voices && voices.length > 0) {
+        let voice = voices.find(v => v.lang === targetLang || v.lang.replace('_', '-') === targetLang)
+          || voices.find(v => v.lang.toLowerCase().startsWith('hi'))
+          || voices.find(v => (v.name || '').toLowerCase().includes('hindi') || (v.name || '').includes('हिन्दी'))
+          || voices.find(v => v.lang.startsWith(targetLang.split('-')[0]));
+        if (voice) {
+          utterance.voice = voice;
+        }
       }
       
       utterance.pitch = 1.0;
-      utterance.rate = 0.95;
+      utterance.rate = 0.90;
+
+      // Workaround for Chromium pause bug
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+
       window.speechSynthesis.speak(utterance);
     } else {
-      alert(langMode === 'hi' ? "आपके ब्राउज़र में ऑडियो सपोर्ट उपलब्ध नहीं है।" : "Speech synthesis is not supported on this browser.");
+      showToast(langMode === 'hi' ? "आपके ब्राउज़र में ऑडियो सपोर्ट उपलब्ध नहीं है।" : "Speech synthesis is not supported on this browser.", "error");
     }
   };
 
