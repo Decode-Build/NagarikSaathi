@@ -17,9 +17,12 @@ services:
         sync: false # Set your Google Gemini API Key in Render Dashboard
       - key: TAVILY_API_KEY
         sync: false # Optional Tavily API Key
+      - key: ALLOW_GUEST_LOGIN
+        value: "true"
       - key: N8N_WHATSAPP_SHARE_WEBHOOK
         value: https://vedu-007.app.n8n.cloud/webhook/scheme-alert
       - key: N8N_FORM_AUTOFILL_WEBHOOK
         value: https://vedu-007.app.n8n.cloud/webhook/submit-beneficiary-form
       - key: N8N_OTP_SEND_WEBHOOK
         value: https://vedu-007.app.n8n.cloud/webhook/90d569f6-da9b-4aae-b44d-b1e623e72353
+

@@ -7,7 +7,7 @@ import { User } from '../models.js';
 import { zeroStorageComplianceMiddleware } from '../middlewares/compliance.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'nagarik_saathi_prod_jwt_secret_token_2026_secure';
 
 // Rate limiting for auth routes
 const authLimiter = rateLimit({

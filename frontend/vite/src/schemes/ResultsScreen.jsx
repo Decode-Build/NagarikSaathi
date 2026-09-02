@@ -4,9 +4,10 @@ import axios from 'axios';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 
-const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-  ? 'http://localhost:5000/api'
-  : `${window.location.origin}/api`;
+const API_BASE = import.meta.env?.VITE_API_URL 
+  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
+    : '/api');
 
 export default function ResultsScreen({ 
   screenerResults, 

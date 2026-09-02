@@ -4,9 +4,10 @@ import { FileText, CheckCircle2, Download, ExternalLink, Upload, AlertCircle, Re
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-  ? 'http://localhost:5000/api'
-  : 'https://nagriksathi-api.vercel.app/api';
+const API_BASE = import.meta.env?.VITE_API_URL 
+  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
+    : '/api');
 
 export default function DocumentsScreen() {
   const { t, lang } = useLanguage();

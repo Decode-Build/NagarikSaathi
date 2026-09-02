@@ -16,9 +16,10 @@ import DocumentsScreen from './documents/DocumentsScreen.jsx';
 import ApplicationsScreen from './dashboard/ApplicationsScreen.jsx';
 import TrackingScreen from './tracking/TrackingScreen.jsx';
 
-const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-  ? 'http://localhost:5000/api'
-  : 'https://nagriksathi-api.vercel.app/api';
+const API_BASE = import.meta.env?.VITE_API_URL 
+  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
+    : '/api');
 
 const generateSessionId = () => `sess-${Math.random().toString(36).substring(2, 9)}`;
 
