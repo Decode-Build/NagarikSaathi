@@ -3,6 +3,11 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { FileCheck, Search, Phone, RefreshCw, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+const API_BASE = import.meta.env?.VITE_API_URL 
+  || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
+    : '/api');
+
 export default function ApplicationsScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -14,7 +19,7 @@ export default function ApplicationsScreen() {
   const fetchApplications = async () => {
     setIsLoadingApps(true);
     try {
-      const res = await fetch(`http://localhost:5001/api/integrations/applications`);
+      const res = await fetch(`${API_BASE}/integrations/applications`);
       if (res.ok) {
         const data = await res.json();
         setApplications(data.applications || []);

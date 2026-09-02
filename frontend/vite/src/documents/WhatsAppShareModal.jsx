@@ -24,9 +24,10 @@ export default function WhatsAppShareModal({
 
   if (!isOpen || !scheme) return null;
 
-  const API_URL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-    ? 'http://localhost:5000/api'
-    : `${window.location.origin}/api`;
+  const API_URL = import.meta.env?.VITE_API_URL 
+    || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:5000/api'
+      : '/api');
 
   const schemeName = lang === 'hi' ? (scheme.nameHindi || scheme.name) : scheme.name;
   const schemeOverview = lang === 'hi' ? (scheme.descriptionHindi || scheme.description || scheme.overview) : (scheme.description || scheme.overview || '');
