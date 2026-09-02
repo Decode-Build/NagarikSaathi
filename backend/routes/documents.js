@@ -21,7 +21,7 @@ router.post('/verify', upload.single('document'), async (req, res) => {
     }
 
     const model = new ChatGoogleGenerativeAI({
-      modelName: "gemini-1.5-flash",
+      modelName: "gemini-3.5-flash",
       apiKey: process.env.GEMINI_API_KEY,
       maxOutputTokens: 1024,
       temperature: 0.1,

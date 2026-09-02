@@ -1,9 +1,15 @@
 import React from 'react';
-import { Users, MessageSquare, FileCheck, Layers, UserCheck, Printer, Award, User, ArrowLeft, Search, Sparkles } from 'lucide-react';
+import { Users, MessageSquare, FileCheck, Layers, UserCheck, Printer, Award, User, ArrowLeft, Search, Sparkles, Mic, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 
-export default function LandingScreen({ initChatSession, handleSendMessage }) {
+export default function LandingScreen({ 
+  initChatSession, 
+  handleSendMessage,
+  startVoiceInput,
+  isListening,
+  isAudioProcessing 
+}) {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
 
@@ -91,8 +97,8 @@ export default function LandingScreen({ initChatSession, handleSendMessage }) {
           </p>
 
           {/* Search Bar & Primary Actions */}
-          <div className="max-w-2xl mx-auto mt-8 bg-white/10 backdrop-blur-xl border border-white/20 p-2 rounded-2xl flex flex-col sm:flex-row gap-2 shadow-xl">
-            <div className="flex-1 relative">
+          <div className="max-w-2xl mx-auto mt-8 bg-white/10 backdrop-blur-xl border border-white/20 p-2 rounded-2xl flex flex-col sm:flex-row gap-2 shadow-xl items-center">
+            <div className="flex-1 relative w-full">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input 
                 type="text"
@@ -108,9 +114,34 @@ export default function LandingScreen({ initChatSession, handleSendMessage }) {
                 }}
               />
             </div>
+
+            {/* Quick Voice Mic Button */}
+            <button
+              type="button"
+              onClick={() => {
+                initChatSession('self');
+                setTimeout(() => {
+                  if (startVoiceInput) startVoiceInput();
+                }, 200);
+              }}
+              className={`p-4 rounded-xl border transition-all flex items-center justify-center ${
+                isListening 
+                  ? 'bg-red-500 border-red-400 text-white animate-pulse' 
+                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-amber-300 hover:text-amber-200 shadow-sm'
+              }`}
+              title={lang === 'hi' ? 'आवाज़ द्वारा खोजें (Speak in Hindi)' : 'Search by Voice'}
+              aria-label={lang === 'hi' ? 'आवाज़ द्वारा खोजें' : 'Search by Voice'}
+            >
+              {isAudioProcessing ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </button>
+
             <button 
               onClick={() => navigate('/session-toggle')}
-              className="px-8 py-4 rounded-xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap"
             >
               <MessageSquare className="w-5 h-5" />
               {t.aiSaathi}

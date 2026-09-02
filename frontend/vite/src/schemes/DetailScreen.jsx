@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Volume2, Printer, AlertTriangle, CreditCard, CheckSquare, Phone, ExternalLink, MessageCircle, FileText } from 'lucide-react';
+import { ArrowLeft, Volume2, Printer, AlertTriangle, CreditCard, CheckSquare, Phone, ExternalLink, MessageCircle, FileText, Square } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import ApplicationFormModal from '../documents/ApplicationFormModal';
@@ -7,7 +7,8 @@ import WhatsAppShareModal from '../documents/WhatsAppShareModal';
 
 export default function DetailScreen({ 
   selectedScheme, chatSources, handleSpeechOutput, 
-  citizenName, setCitizenName, isSchemeStale, formatDate, handleReportScheme 
+  citizenName, setCitizenName, isSchemeStale, formatDate, handleReportScheme,
+  isSpeaking, speakingId, stopSpeech 
 }) {
   const { t, lang: langMode } = useLanguage();
   const navigate = useNavigate();
@@ -39,13 +40,26 @@ export default function DetailScreen({
               const textToSpeak = langMode === 'hi' 
                 ? (selectedScheme.descriptionHindi || selectedScheme.description || selectedScheme.nameHindi || selectedScheme.name)
                 : (selectedScheme.description || selectedScheme.descriptionHindi || selectedScheme.name);
-              handleSpeechOutput(textToSpeak);
+              handleSpeechOutput(textToSpeak, `detail-${selectedScheme.schemeId}`);
             }}
-            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+            className={`border px-4 py-2.5 rounded text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors cursor-pointer ${
+              isSpeaking && speakingId === `detail-${selectedScheme.schemeId}`
+                ? 'bg-red-50 text-red-700 border-red-300 ring-2 ring-red-200'
+                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+            }`}
             aria-label={t.speakBtn}
           >
-            <Volume2 className="w-4 h-4 text-green-600" />
-            <span>{t.speakBtn}</span>
+            {isSpeaking && speakingId === `detail-${selectedScheme.schemeId}` ? (
+              <>
+                <Square className="w-4 h-4 fill-red-600 text-red-600 animate-pulse" />
+                <span>{langMode === 'hi' ? 'रोकें (Stop)' : 'Stop Audio'}</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-4 h-4 text-green-600" />
+                <span>{t.speakBtn || (langMode === 'hi' ? 'विवरण सुनें' : 'Listen')}</span>
+              </>
+            )}
           </button>
 
           <button 
