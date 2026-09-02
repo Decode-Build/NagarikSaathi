@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import connectDB from './db.js';
 import { Scheme, ChatSession, EligibilityProfile, User, DraftRule, SchemeVersion } from './models.js';
 import { schemesData } from './seed.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import bcrypt from 'bcryptjs';
@@ -60,26 +61,25 @@ import authRoutes, { requireAuth, getUserFromHeader } from './routes/auth.js';
 import schemeRoutes from './routes/schemes.js';
 import integrationsRoutes from './routes/integrations.js';
 import documentsRoutes from './routes/documents.js';
+import audioRoutes from './routes/audio.js';
 
 // Setup Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', schemeRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/documents', documentsRoutes);
+app.use('/api/audio', audioRoutes);
 
 // Initialize Gemini LLM
+let genAI = null;
 let model = null;
 const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 if (apiKey) {
   try {
-    model = new ChatGoogleGenerativeAI({
-      modelName: "gemini-3.5-flash",
-      apiKey: apiKey,
-      maxOutputTokens: 2048,
-    });
-    console.log("Gemini LLM initialized successfully.");
+    genAI = new GoogleGenerativeAI(apiKey);
+    console.log("Gemini Generative AI SDK initialized successfully.");
   } catch (error) {
-    console.error("Failed to initialize Gemini LLM:", error.message);
+    console.error("Failed to initialize Gemini Generative AI SDK:", error.message);
   }
 } else {
   console.warn("WARNING: No GEMINI_API_KEY or GOOGLE_API_KEY found in environment. Server will run in Mock Fallback mode for chat queries.");
@@ -87,24 +87,59 @@ if (apiKey) {
 
 // Helper to clean and parse Gemini JSON response
 const parseGeminiResponse = (text) => {
-  let cleaned = text.trim();
+  if (!text) return { answer: "", citedSchemeIds: [], confidence: "low" };
+  let cleaned = String(text).trim();
+
+  // Strip markdown code block fences if present
+  if (cleaned.startsWith('```json')) {
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
+  } else if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+  }
+
+  // Find { and }
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+
+  // Attempt 1: Direct JSON parse
   try {
-    // Robust extraction: find first { and last }
-    const firstBrace = cleaned.indexOf('{');
-    const lastBrace = cleaned.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-    }
     return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("Failed to parse Gemini response as JSON. Raw response:", text);
-    // Fallback parser: search for cited scheme IDs via regex
-    const matches = [...cleaned.matchAll(/[a-zA-Z0-9-_]+/g)].map(m => m[0]);
-    return {
-      answer: text,
-      citedSchemeIds: [],
-      confidence: "low"
-    };
+  } catch (e1) {
+    // Attempt 2: Sanitize raw newlines / tabs inside JSON strings
+    try {
+      const sanitized = cleaned
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/\t/g, ' ');
+      return JSON.parse(sanitized);
+    } catch (e2) {
+      // Attempt 3: Regex extraction for answer, citedSchemeIds, confidence
+      const answerMatch = cleaned.match(/"answer"\s*:\s*"([\s\S]*?)"\s*,\s*"citedSchemeIds"/);
+      const citedMatch = cleaned.match(/"citedSchemeIds"\s*:\s*\[(.*?)\]/);
+      const confMatch = cleaned.match(/"confidence"\s*:\s*"([a-zA-Z]+)"/);
+
+      if (answerMatch && answerMatch[1]) {
+        let citedIds = [];
+        if (citedMatch && citedMatch[1]) {
+          citedIds = citedMatch[1].split(',').map(s => s.replace(/["'\s]/g, '')).filter(Boolean);
+        }
+        return {
+          answer: answerMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'),
+          citedSchemeIds: citedIds,
+          confidence: (confMatch && confMatch[1]) ? confMatch[1] : "medium"
+        };
+      }
+
+      // Fallback: Clean string response
+      console.warn("Using cleaned text fallback for LLM response.");
+      return {
+        answer: cleaned.replace(/^[{"'\s]+answer["'\s:]+/i, '').replace(/["'\s,}]+$/i, '').trim() || text,
+        citedSchemeIds: [],
+        confidence: "medium"
+      };
+    }
   }
 };
 
@@ -301,103 +336,96 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
     }
 
     let parsed = null;
-    const isMockMode = !model;
     const scoredSchemesMap = {};
 
-    if (!isMockMode) {
-      try {
-        let topSchemes = schemes;
-        if (apiKey) {
-          try {
-            const { GoogleGenerativeAIEmbeddings } = await import("@langchain/google-genai");
-            const embeddings = new GoogleGenerativeAIEmbeddings({
-              modelName: "gemini-embedding-2",
-              apiKey: apiKey
-            });
-            const queryToEmbed = userProfileText ? `${message} (Profile: ${userProfileText})` : message;
+    // Rank schemes by relevance to the query
+    const qLower = message.toLowerCase();
+    const rankedSchemes = schemes.map(s => {
+      let score = 0.5;
+      const textToScan = `${s.name} ${s.nameHindi || ''} ${s.description} ${s.descriptionHindi || ''} ${(s.category || []).join(' ')} ${JSON.stringify(s.benefits || '')}`.toLowerCase();
+      
+      const words = qLower.split(/\s+/).filter(w => w.length > 2);
+      words.forEach(w => {
+        if (textToScan.includes(w)) score += 0.15;
+      });
 
-            // Timeout wrapper: embedding must complete within 8 seconds
-            const embedWithTimeout = Promise.race([
-              embeddings.embedQuery(queryToEmbed),
-              new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Embedding API timeout after 8s')), 8000)
-              )
-            ]);
-            const queryVector = await embedWithTimeout;
-
-            const scoredSchemes = schemes.map(scheme => {
-              let score = 0;
-              if (scheme.embedding && scheme.embedding.length > 0) {
-                score = cosineSimilarity(queryVector, scheme.embedding);
-              }
-              const obj = typeof scheme.toObject === 'function' ? scheme.toObject() : scheme;
-              return { ...obj, score };
-            });
-            scoredSchemes.forEach(s => {
-              scoredSchemesMap[s.schemeId] = s.score;
-            });
-            scoredSchemes.sort((a, b) => b.score - a.score);
-            topSchemes = scoredSchemes.slice(0, 5);
-            console.log(`RAG Retrieval: Top match score ${topSchemes[0]?.score || 0}`);
-          } catch (embedError) {
-            console.error("Embedding generation failed, falling back to full context:", embedError.message);
-          }
-        }
-
-        // Language instruction - Hindi is enforced at top AND bottom of prompt
-        const hindiModeActive = activeLang === 'hi';
-        const langInstruction = hindiModeActive
-          ? 'CRITICAL LANGUAGE RULE: The user may ask questions in Hindi, English, or mixed Hinglish (e.g., "Farmers ke liye schemes"). Regardless of the input language, you MUST write the answer field ENTIRELY in pure Hindi Devanagari script. Do NOT write English sentences in the answer. Use nameHindi for scheme names.'
-          : 'CRITICAL LANGUAGE RULE: The user may ask questions in Hindi, English, or mixed Hinglish. Regardless of the input language, you MUST write the answer field ENTIRELY in clear English. Use the English scheme names.';
-
-        const systemPrompt = (hindiModeActive ? 'MANDATORY: RESPOND IN HINDI (DEVANAGARI) ONLY.\n\n' : '') +
-          'You are NagarikSaathi, a government scheme assistant for rural India.\n' +
-          'You help CSC/VLE operators assist rural citizens discover government schemes.\n\n' +
-          langInstruction + '\n\n' +
-          'Top relevant schemes (use nameHindi and descriptionHindi for Hindi answers):\n\n' +
-          JSON.stringify(topSchemes.map(s => ({ schemeId: s.schemeId, name: s.name, nameHindi: s.nameHindi || s.name, description: s.description, descriptionHindi: s.descriptionHindi || '', benefits: s.benefits, benefitsHindi: s.benefitsHindi || [] })), null, 2) + '\n\n' +
-          (userProfileText ? 'PROFILE: ' + userProfileText + '\n\n' : '') +
-          'RULES:\n' +
-          '1. Cite scheme names using schemeId in citedSchemeIds array.\n' +
-          '2. Never invent schemes, documents, or phone numbers not in the context above.\n' +
-          '3. If no clear match, set confidence to "low".\n' +
-          '4. Respond ONLY with JSON: { "answer": string, "citedSchemeIds": string[], "confidence": "high"|"medium"|"low" }\n' +
-          (hindiModeActive ? '\nFINAL REMINDER: answer MUST be 100% Hindi Devanagari. No English sentences allowed in the answer.\n' : '') +
-          '\nRespond ONLY with the JSON object. No text before or after.';
-
-
-        // Format message history
-        const historyMessages = session.messages.map(m => {
-          return m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content);
-        });
-
-        // Query LLM with a 28-second timeout — fall back to rule-based match if too slow
-        const llmWithTimeout = Promise.race([
-          model.invoke([
-            new SystemMessage(systemPrompt),
-            ...historyMessages,
-            new HumanMessage(message)
-          ]),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('LLM API timeout after 28s')), 28000)
-          )
-        ]);
-        const response = await llmWithTimeout;
-
-        parsed = parseGeminiResponse(response.content);
-      } catch (geminiError) {
-        console.error("Gemini invocation failed, falling back to local rule-based match:", geminiError.message);
-        parsed = getMockResponse(message, schemes, preferredLang);
+      if (userState && s.eligibility?.states?.includes(userState)) {
+        score += 0.10;
       }
-    } else {
-      // Mock mode
-      parsed = getMockResponse(message, schemes, preferredLang);
-      // In mock mode, if userState is present and query doesn't yield results, let's inject userState schemes
+      return { scheme: s, score: Math.min(score, 0.98) };
+    });
+
+    rankedSchemes.sort((a, b) => b.score - a.score);
+    const topSchemes = rankedSchemes.slice(0, 6).map(r => r.scheme);
+    rankedSchemes.slice(0, 6).forEach(r => {
+      scoredSchemesMap[r.scheme.schemeId] = r.score;
+    });
+
+    // Language instruction - Hindi is enforced if activeLang is 'hi' or if message contains Hindi Devanagari characters
+    const hindiModeActive = activeLang === 'hi' || Boolean(message.match(/[\u0900-\u097F]/));
+    const langInstruction = hindiModeActive
+      ? 'CRITICAL LANGUAGE RULE: The user is asking in Hindi or Hinglish. Regardless of the input language, you MUST write the answer field ENTIRELY in pure Hindi Devanagari script. Do NOT write English sentences in the answer. Use nameHindi for scheme names.'
+      : 'CRITICAL LANGUAGE RULE: The user may ask questions in Hindi, English, or mixed Hinglish. Regardless of the input language, you MUST write the answer field ENTIRELY in clear English. Use the English scheme names.';
+
+    const systemPrompt = (hindiModeActive ? 'MANDATORY: RESPOND IN HINDI (DEVANAGARI) ONLY.\n\n' : '') +
+      'You are NagarikSaathi, a government scheme assistant for rural India.\n' +
+      'You help CSC/VLE operators assist rural citizens discover government schemes.\n\n' +
+      langInstruction + '\n\n' +
+      'Top relevant schemes (use nameHindi and descriptionHindi for Hindi answers):\n\n' +
+      JSON.stringify(topSchemes.map(s => ({ schemeId: s.schemeId, name: s.name, nameHindi: s.nameHindi || s.name, description: s.description, descriptionHindi: s.descriptionHindi || '', benefits: s.benefits, benefitsHindi: s.benefitsHindi || [] })), null, 2) + '\n\n' +
+      (userProfileText ? 'PROFILE: ' + userProfileText + '\n\n' : '') +
+      'RULES:\n' +
+      '1. Cite scheme names using schemeId in citedSchemeIds array.\n' +
+      '2. Never invent schemes, documents, or phone numbers not in the context above.\n' +
+      '3. If no clear match, set confidence to "low".\n' +
+      '4. Respond ONLY with JSON: { "answer": string, "citedSchemeIds": string[], "confidence": "high"|"medium"|"low" }\n' +
+      (hindiModeActive ? '\nFINAL REMINDER: answer MUST be 100% Hindi Devanagari. No English sentences allowed in the answer.\n' : '') +
+      '\nRespond ONLY with the JSON object. No text before or after.';
+
+    if (genAI) {
+      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash'];
+      for (const mName of modelsToTry) {
+        try {
+          const geminiModel = genAI.getGenerativeModel({
+            model: mName,
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 1500
+            }
+          });
+
+          // History context
+          const historyText = session.messages.slice(-6).map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+          const fullPrompt = `${systemPrompt}\n\n${historyText ? 'Recent Conversation:\n' + historyText + '\n\n' : ''}Current User Question: ${message}`;
+
+          const llmCall = Promise.race([
+            geminiModel.generateContent({
+              contents: [{ role: 'user', parts: [{ text: fullPrompt }] }]
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error(`LLM timeout on ${mName}`)), 12000))
+          ]);
+
+          const result = await llmCall;
+          const rawText = result.response.text();
+          parsed = parseGeminiResponse(rawText);
+
+          if (parsed && parsed.answer) {
+            console.log(`AI Saathi responded using model: ${mName}`);
+            break;
+          }
+        } catch (geminiError) {
+          console.warn(`Gemini model ${mName} failed in /api/chat:`, geminiError.message);
+        }
+      }
+    }
+
+    if (!parsed || !parsed.answer) {
+      console.log("Using local matching engine fallback for AI Saathi response.");
+      parsed = getMockResponse(message, schemes, activeLang || (Boolean(message.match(/[\u0900-\u097F]/)) ? 'hi' : 'en'));
       if (parsed.citedSchemeIds.length === 0 && userState) {
-        const stateSchemes = schemes.filter(s => s.eligibility.states.includes(userState));
+        const stateSchemes = schemes.filter(s => s.eligibility?.states?.includes(userState));
         if (stateSchemes.length > 0) {
           parsed.citedSchemeIds = stateSchemes.slice(0, 2).map(s => s.schemeId);
-          parsed.answer += `\n\n[Profile Notice: We recommend checking state-specific schemes for ${userState} like: ${stateSchemes.slice(0,2).map(s => s.name).join(', ')}]`;
         }
       }
     }
@@ -478,16 +506,25 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
     session.lastActivity = new Date();
     await session.save();
 
-    appRes.json({
+    return appRes.json({
       answer: parsed.answer,
       sources,
       confidence: parsed.confidence || 'low',
-      isMockMode
+      isMockMode: !genAI
     });
 
   } catch (error) {
-    console.error("Error in /api/chat:", error);
-    appRes.status(500).json({ error: "Internal server error." });
+    console.error("Error in /api/chat, returning fallback matching response:", error.message);
+    const isHindi = Boolean((appReq.body.message || '').match(/[\u0900-\u097F]/)) || appReq.body.language === 'hi' || appReq.body.preferredLang === 'hi';
+    const fallbackResp = getMockResponse(appReq.body.message || '', schemesData, isHindi ? 'hi' : 'en');
+    const fallbackSources = schemesData.filter(s => (fallbackResp.citedSchemeIds || []).includes(s.schemeId));
+
+    return appRes.json({
+      answer: fallbackResp.answer,
+      sources: fallbackSources,
+      confidence: "medium",
+      isMockMode: true
+    });
   }
 });
 

@@ -4,6 +4,8 @@ import Layout from './layouts/Layout.jsx';
 import axios from 'axios';
 import { AlertTriangle, Check } from 'lucide-react';
 import { useLanguage } from './i18n/LanguageContext';
+import { useVoiceInput } from './hooks/useVoiceInput.js';
+import { useTextToSpeech } from './hooks/useTextToSpeech.js';
 
 import EligibilityScreener from './schemes/EligibilityScreener.jsx';
 import ResultsScreen from './schemes/ResultsScreen.jsx';
@@ -53,46 +55,6 @@ export default function App() {
     }, 4500);
   };
 
-  // Voice recognition state & handler
-  const [isListening, setIsListening] = useState(false);
-
-  const startVoiceInput = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      showToast(langMode === 'hi' ? "वॉइस रिकग्निशन समर्थित नहीं है।" : "Voice recognition is not supported on this browser.", "error");
-      return;
-    }
-    
-    window.speechSynthesis.cancel();
-    const recognition = new SpeechRecognition();
-    recognition.lang = langMode === 'hi' ? 'hi-IN' : 'en-IN';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => {
-      setIsListening(true);
-      showToast(langMode === 'hi' ? "सुन रहा हूँ... बोलिए" : "Listening... Speak now", "success");
-    };
-
-    recognition.onerror = (event) => {
-      setIsListening(false);
-      showToast(langMode === 'hi' ? "ऑडियो समझ नहीं आया। कृपया फिर से प्रयास करें।" : "Could not understand the audio. Please try again.", "error");
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.onresult = (event) => {
-      const speechToText = event.results[0][0].transcript;
-      setChatMessage(speechToText);
-      showToast(langMode === 'hi' ? `पहचाना गया: "${speechToText}"` : `Recognized: "${speechToText}"`, "success");
-      handleSendMessage(null, speechToText);
-    };
-
-    recognition.start();
-  };
-
   // Chat States
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
@@ -100,6 +62,79 @@ export default function App() {
   const [chatConfidence, setChatConfidence] = useState(null);
   const [chatSources, setChatSources] = useState([]);
   const [operatorStats, setOperatorStats] = useState({ citizensHelped: 0, avgResponseTimeSec: null, matchRate: 'N/A', districtRank: 'N/A', categoriesMatched: [], recentActivity: [] });
+
+  const handleSendMessage = async (e, prefilledMsg = null) => {
+    if (e) e.preventDefault();
+    const textToSend = prefilledMsg || chatMessage;
+    if (!textToSend.trim() || chatLoading) return;
+
+    const userMsg = { role: 'user', content: textToSend, timestamp: new Date() };
+    setChatHistory(prev => [...prev, userMsg]);
+    setChatMessage('');
+    setChatLoading(true);
+
+    try {
+      setGlobalError('');
+      // Auto-detect Hindi in message or use active langMode / voiceLang
+      const isHindi = /[\u0900-\u097F]/.test(textToSend) || langMode === 'hi' || voiceLang === 'hi';
+      const response = await axios.post(`${API_BASE}/chat`, {
+        message: textToSend,
+        sessionId,
+        sessionType,
+        language: isHindi ? 'hi' : langMode
+      }, { timeout: 35000 });
+
+      const { answer, sources, confidence, isMockMode } = response.data;
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: answer,
+        sources,
+        confidence,
+        isMockMode,
+        timestamp: new Date()
+      }]);
+      
+      setChatConfidence(confidence);
+      setChatSources(sources || []);
+      fetchStats();
+    } catch (err) {
+      const errMsg = "Failed to connect to backend.";
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: errMsg,
+        sources: [],
+        confidence: "low",
+        timestamp: new Date()
+      }]);
+      setChatConfidence("low");
+      setGlobalError(errMsg);
+      showToast(errMsg, "error");
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  // Dual-Engine Voice Input (Web Speech API with 'hi-IN' + MediaRecorder Gemini STT fallback)
+  const {
+    isListening,
+    isProcessing: isAudioProcessing,
+    voiceLang,
+    setVoiceLang,
+    toggleVoiceLang,
+    interimTranscript,
+    audioLevel,
+    startListening: startVoiceInput,
+    stopListening: stopVoiceInput,
+    stopAllAudio
+  } = useVoiceInput({
+    apiBase: API_BASE,
+    defaultLang: langMode || 'hi',
+    onResult: (recognizedText) => {
+      setChatMessage(recognizedText);
+      handleSendMessage(null, recognizedText);
+    },
+    showToast
+  });
 
   // Eligibility Screener States
   const [profile, setProfile] = useState({
@@ -149,55 +184,6 @@ export default function App() {
     navigate('/chat');
   };
 
-  const handleSendMessage = async (e, prefilledMsg = null) => {
-    if (e) e.preventDefault();
-    const textToSend = prefilledMsg || chatMessage;
-    if (!textToSend.trim() || chatLoading) return;
-
-    const userMsg = { role: 'user', content: textToSend, timestamp: new Date() };
-    setChatHistory(prev => [...prev, userMsg]);
-    setChatMessage('');
-    setChatLoading(true);
-
-    try {
-      setGlobalError('');
-      const response = await axios.post(`${API_BASE}/chat`, {
-        message: textToSend,
-        sessionId,
-        sessionType,
-        language: langMode // explicitly pass language preference
-      }, { timeout: 35000 });
-
-      const { answer, sources, confidence, isMockMode } = response.data;
-      setChatHistory(prev => [...prev, {
-        role: 'assistant',
-        content: answer,
-        sources,
-        confidence,
-        isMockMode,
-        timestamp: new Date()
-      }]);
-      
-      setChatConfidence(confidence);
-      setChatSources(sources || []);
-      fetchStats();
-    } catch (err) {
-      const errMsg = "Failed to connect to backend.";
-      setChatHistory(prev => [...prev, {
-        role: 'assistant',
-        content: errMsg,
-        sources: [],
-        confidence: "low",
-        timestamp: new Date()
-      }]);
-      setChatConfidence("low");
-      setGlobalError(errMsg);
-      showToast(errMsg, "error");
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
   const handleRunScreener = async (e) => {
     e.preventDefault();
     navigate('/schemes');
@@ -228,47 +214,11 @@ export default function App() {
     }
   };
 
-  const handleSpeechOutput = (text) => {
-    if (!text) return;
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      
-      const cleanText = String(text || '')
-        .replace(/[*_#`~>]/g, '')
-        .replace(/\[(.*?)\]\(.*?\)/g, '$1')
-        .trim();
-      
-      if (!cleanText) return;
+  // Text-To-Speech Engine (Web Speech API with Hindi/English voice matching + Server Audio fallback)
+  const tts = useTextToSpeech({ apiBase: API_BASE, showToast });
 
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      
-      const isHindi = /[\u0900-\u097F]/.test(cleanText) || langMode === 'hi';
-      const targetLang = isHindi ? 'hi-IN' : 'en-IN';
-      utterance.lang = targetLang;
-      
-      const voices = window.speechSynthesis.getVoices();
-      if (voices && voices.length > 0) {
-        let voice = voices.find(v => v.lang === targetLang || v.lang.replace('_', '-') === targetLang)
-          || voices.find(v => v.lang.toLowerCase().startsWith('hi'))
-          || voices.find(v => (v.name || '').toLowerCase().includes('hindi') || (v.name || '').includes('हिन्दी'))
-          || voices.find(v => v.lang.startsWith(targetLang.split('-')[0]));
-        if (voice) {
-          utterance.voice = voice;
-        }
-      }
-      
-      utterance.pitch = 1.0;
-      utterance.rate = 0.90;
-
-      // Workaround for Chromium pause bug
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
-
-      window.speechSynthesis.speak(utterance);
-    } else {
-      showToast(langMode === 'hi' ? "आपके ब्राउज़र में ऑडियो सपोर्ट उपलब्ध नहीं है।" : "Speech synthesis is not supported on this browser.", "error");
-    }
+  const handleSpeechOutput = (text, id = null) => {
+    tts.speak(text, id);
   };
 
   const formatDate = (dateStr) => {
@@ -314,7 +264,15 @@ export default function App() {
 
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<LandingScreen initChatSession={initChatSession} handleSendMessage={handleSendMessage} />} />
+          <Route path="/" element={
+            <LandingScreen 
+              initChatSession={initChatSession} 
+              handleSendMessage={handleSendMessage}
+              startVoiceInput={startVoiceInput}
+              isListening={isListening}
+              isAudioProcessing={isAudioProcessing}
+            />
+          } />
           
           <Route path="/chat" element={
             <ChatScreen 
@@ -328,12 +286,21 @@ export default function App() {
               chatMessage={chatMessage} 
               setChatMessage={setChatMessage} 
               startVoiceInput={startVoiceInput} 
+              stopVoiceInput={stopVoiceInput}
               isListening={isListening} 
+              isAudioProcessing={isAudioProcessing}
+              voiceLang={voiceLang}
+              toggleVoiceLang={toggleVoiceLang}
+              interimTranscript={interimTranscript}
+              audioLevel={audioLevel}
               chatSources={chatSources} 
               setSelectedScheme={setSelectedScheme} 
               formatDate={formatDate} 
               getDomain={getDomain} 
               handleSpeechOutput={handleSpeechOutput}
+              isSpeaking={tts.isPlaying}
+              speakingId={tts.currentId}
+              stopSpeech={tts.stop}
             />
           } />
           
@@ -356,7 +323,7 @@ export default function App() {
           
           <Route path="/detail" element={
             selectedScheme ? 
-              <DetailScreen selectedScheme={selectedScheme} chatSources={chatSources} handleSpeechOutput={handleSpeechOutput} citizenName={citizenName} setCitizenName={setCitizenName} isSchemeStale={isSchemeStale} formatDate={formatDate} handleReportScheme={handleReportScheme} /> 
+              <DetailScreen selectedScheme={selectedScheme} chatSources={chatSources} handleSpeechOutput={handleSpeechOutput} isSpeaking={tts.isPlaying} speakingId={tts.currentId} stopSpeech={tts.stop} citizenName={citizenName} setCitizenName={setCitizenName} isSchemeStale={isSchemeStale} formatDate={formatDate} handleReportScheme={handleReportScheme} /> 
               : <div className="p-8 text-center text-gray-500">No scheme selected.</div>
           } />
         </Route>

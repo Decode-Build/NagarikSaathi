@@ -156,9 +156,14 @@ const ApplicationSchema = new mongoose.Schema({
   },
   verificationToken: { type: String },
   status: { type: String, enum: ['SUBMITTED', 'VERIFIED', 'PROCESSED', 'REJECTED'], default: 'SUBMITTED' },
+  remarks: { type: String, default: '' },
+  verifiedAt: { type: Date },
+  approvedAt: { type: Date },
+  rejectedAt: { type: Date },
   downloadUrl: { type: String },
   n8nGenerated: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 });
 
 export const Application = mongoose.model('Application', ApplicationSchema);

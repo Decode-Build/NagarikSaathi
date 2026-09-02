@@ -447,6 +447,7 @@ router.post('/submit-application', async (req, res) => {
 });
 
 /**
+/**
  * 5. GET /api/integrations/applications
  * Returns all filled applications for the Admin Panel
  */
@@ -462,7 +463,9 @@ router.get('/applications', async (req, res) => {
             _id: "mock_123",
             applicationId: "NS-APP-MOCK1",
             schemeName: "PM Awas Yojana",
-            applicant: { fullName: "Ramesh Kumar", phone: "9876543210", district: "Bhopal" },
+            applicant: { fullName: "Ramesh Kumar", phone: "9876543210", district: "Bhopal", state: "Madhya Pradesh" },
+            status: "SUBMITTED",
+            remarks: "Initial submission received.",
             createdAt: new Date()
           }
         ]
@@ -482,59 +485,203 @@ router.get('/applications', async (req, res) => {
 });
 
 /**
- * 6. GET /api/integrations/applications/track/:applicationId
- * Returns real tracking timeline data for the citizen portal
+ * 6. PATCH /api/integrations/applications/:id/status
+ * POST /api/integrations/applications/:id/status
+ * Updates status (SUBMITTED, VERIFIED, PROCESSED, REJECTED) and remarks for an application
  */
-router.get('/applications/track/:applicationId', async (req, res) => {
+const updateApplicationStatusHandler = async (req, res) => {
   try {
-    const { applicationId } = req.params;
-    const application = await Application.findOne({ applicationId: applicationId.toUpperCase() });
+    const { id } = req.params;
+    const { status, remarks } = req.body;
 
-    if (!application) {
-      return res.status(404).json({ error: 'Application not found. Please check your Reference ID.' });
+    const validStatuses = ['SUBMITTED', 'VERIFIED', 'PROCESSED', 'REJECTED'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      });
     }
 
-    const { status, schemeName, applicant, createdAt } = application;
-    
-    // Build dynamic timeline based on status
+    if (mongoose.connection.readyState !== 1) {
+      return res.json({
+        success: true,
+        message: `Application ${id} status updated to ${status} (Dev/Mock Mode).`,
+        application: {
+          applicationId: id,
+          status,
+          remarks: remarks || '',
+          updatedAt: new Date()
+        }
+      });
+    }
+
+    // Lookup by applicationId or MongoDB _id
+    let application = await Application.findOne({
+      $or: [
+        { applicationId: id.toUpperCase() },
+        { applicationId: id },
+        ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: id }] : [])
+      ]
+    });
+
+    if (!application) {
+      return res.status(404).json({ error: `Application not found for ID: ${id}` });
+    }
+
+    application.status = status;
+    if (remarks !== undefined) {
+      application.remarks = remarks;
+    }
+    application.updatedAt = new Date();
+
+    if (status === 'VERIFIED') {
+      application.verifiedAt = new Date();
+    } else if (status === 'PROCESSED') {
+      if (!application.verifiedAt) application.verifiedAt = new Date();
+      application.approvedAt = new Date();
+    } else if (status === 'REJECTED') {
+      application.rejectedAt = new Date();
+    }
+
+    await application.save();
+
+    return res.json({
+      success: true,
+      message: `Application status updated to ${status} successfully.`,
+      application
+    });
+
+  } catch (err) {
+    console.error('Error updating application status:', err);
+    return res.status(500).json({ error: 'Failed to update application status: ' + err.message });
+  }
+};
+
+router.patch('/applications/:id/status', updateApplicationStatusHandler);
+router.post('/applications/:id/status', updateApplicationStatusHandler);
+
+/**
+ * 7. GET /api/integrations/applications/track/:query
+ * Returns real tracking timeline data by Application Reference ID OR Citizen Phone Number
+ */
+router.get('/applications/track/:query', async (req, res) => {
+  try {
+    const rawQuery = String(req.params.query || '').trim();
+    if (!rawQuery) {
+      return res.status(400).json({ error: 'Tracking ID or Phone number is required.' });
+    }
+
+    const cleanPhone = rawQuery.replace(/\D/g, '');
+    let application = null;
+
+    if (mongoose.connection.readyState === 1) {
+      // 1. Search by Application ID
+      application = await Application.findOne({
+        $or: [
+          { applicationId: rawQuery.toUpperCase() },
+          { applicationId: rawQuery }
+        ]
+      });
+
+      // 2. Search by Phone Number if not found by ID
+      if (!application && cleanPhone.length >= 10) {
+        const last10 = cleanPhone.slice(-10);
+        application = await Application.findOne({
+          $or: [
+            { 'applicant.phone': last10 },
+            { 'applicant.phone': { $regex: last10 } }
+          ]
+        }).sort({ createdAt: -1 });
+      }
+    }
+
+    // Mock fallback if DB is offline or mock ID is used
+    if (!application) {
+      if (rawQuery.toUpperCase() === 'NS-APP-MOCK1' || cleanPhone.endsWith('9876543210')) {
+        application = {
+          applicationId: "NS-APP-MOCK1",
+          schemeName: "Pradhan Mantri Awas Yojana (Gramin)",
+          applicant: { fullName: "Ramesh Kumar", phone: "9876543210" },
+          status: "SUBMITTED",
+          remarks: "Application received and queued for CSC operator document verification.",
+          createdAt: new Date(Date.now() - 3600000)
+        };
+      } else {
+        return res.status(404).json({
+          error: `No application found for "${rawQuery}". Please check the Application Reference ID (e.g. NS-APP-...) or 10-digit Phone Number.`
+        });
+      }
+    }
+
+    const { applicationId, status, schemeName, applicant, createdAt, verifiedAt, approvedAt, rejectedAt, updatedAt, remarks } = application;
+    const isRejected = status === 'REJECTED';
+    const isVerified = status === 'VERIFIED' || status === 'PROCESSED';
+    const isProcessed = status === 'PROCESSED';
+
+    // Build real tracking timeline reflecting MongoDB status
     const timeline = [
       { 
         stage: 'submitted', 
         date: createdAt, 
         completed: true, 
         labelEn: 'Application Submitted', 
-        labelHi: 'आवेदन जमा किया गया' 
+        labelHi: 'आवेदन जमा किया गया',
+        descriptionEn: 'Application successfully registered and verified via WhatsApp OTP.',
+        descriptionHi: 'आवेदन सफलतापूर्वक दर्ज किया गया और WhatsApp OTP द्वारा सत्यापित।'
       },
       { 
         stage: 'document_verification', 
-        date: status === 'VERIFIED' || status === 'PROCESSED' || status === 'REJECTED' ? new Date(createdAt.getTime() + 86400000) : null, 
-        completed: status === 'VERIFIED' || status === 'PROCESSED', 
+        date: isVerified ? (verifiedAt || updatedAt) : (isRejected ? rejectedAt : null), 
+        completed: isVerified, 
+        inProgress: status === 'SUBMITTED',
         labelEn: 'Document Verification', 
-        labelHi: 'दस्तावेज़ सत्यापन' 
+        labelHi: 'दस्तावेज़ सत्यापन',
+        descriptionEn: isVerified 
+          ? 'All eligibility documents verified by CSC Operator.' 
+          : (isRejected ? 'Verification stopped due to discrepancy.' : 'CSC Operator is reviewing uploaded documents.'),
+        descriptionHi: isVerified 
+          ? 'सीएससी ऑपरेटर द्वारा सभी दस्तावेज़ सत्यापित किए गए।' 
+          : (isRejected ? 'दस्तावेज़ विसंगति के कारण सत्यापन रुका।' : 'सीएससी ऑपरेटर दस्तावेजों की समीक्षा कर रहे हैं।')
       },
       { 
         stage: 'approval', 
-        date: status === 'PROCESSED' ? new Date(createdAt.getTime() + 172800000) : null, 
-        completed: status === 'PROCESSED', 
-        labelEn: 'Final Approval', 
-        labelHi: 'अंतिम स्वीकृति' 
+        date: isProcessed ? (approvedAt || updatedAt) : null, 
+        completed: isProcessed, 
+        inProgress: status === 'VERIFIED',
+        labelEn: 'Department Approval', 
+        labelHi: 'विभागीय स्वीकृति',
+        descriptionEn: isProcessed 
+          ? 'Scheme sanction order generated and approved by department authority.' 
+          : 'Pending department sanction order review.',
+        descriptionHi: isProcessed 
+          ? 'विभाग द्वारा योजना स्वीकृति आदेश जारी किया गया।' 
+          : 'विभागीय स्वीकृति समीक्षा प्रतीक्षित।'
       },
       { 
         stage: 'disbursal', 
-        date: status === 'PROCESSED' ? new Date(createdAt.getTime() + 259200000) : null, 
-        completed: status === 'PROCESSED', 
-        labelEn: 'Benefit Disbursal', 
-        labelHi: 'लाभ वितरण' 
+        date: isProcessed ? (approvedAt || updatedAt) : null, 
+        completed: isProcessed, 
+        inProgress: false,
+        labelEn: 'Benefit Disbursal & Fulfillment', 
+        labelHi: 'लाभ वितरण एवं भुगतान',
+        descriptionEn: isProcessed 
+          ? 'Direct Benefit Transfer (DBT) dispatched to beneficiary bank account / entitlement activated.' 
+          : 'Awaiting final financial transfer dispatch.',
+        descriptionHi: isProcessed 
+          ? 'लाभार्थी के बैंक खाते में डीबीटी (DBT) लाभ सफलतापूर्वक हस्तांतरित किया गया।' 
+          : 'अंतिम वित्तीय भुगतान आदेश प्रतीक्षित।'
       }
     ];
 
-    if (status === 'REJECTED') {
+    if (isRejected) {
       timeline.push({
         stage: 'rejected',
-        date: new Date(),
+        date: rejectedAt || updatedAt || new Date(),
         completed: true,
+        isError: true,
         labelEn: 'Application Rejected',
-        labelHi: 'आवेदन अस्वीकृत'
+        labelHi: 'आवेदन अस्वीकृत',
+        descriptionEn: remarks ? `Reason: ${remarks}` : 'Application was rejected during scrutiny by the operator/department.',
+        descriptionHi: remarks ? `कारण: ${remarks}` : 'समीक्षा के दौरान आवेदन अस्वीकृत कर दिया गया।'
       });
     }
 
@@ -542,16 +689,21 @@ router.get('/applications/track/:applicationId', async (req, res) => {
       success: true,
       data: {
         id: applicationId,
+        applicationId,
         scheme: schemeName,
-        applicant: applicant.fullName,
+        applicantName: applicant?.fullName || 'Citizen Applicant',
+        phone: applicant?.phone || '',
         currentStage: status,
+        remarks: remarks || '',
+        submittedAt: createdAt,
+        updatedAt: updatedAt || createdAt,
         timeline
       }
     });
 
   } catch (err) {
     console.error('Error tracking application:', err);
-    return res.status(500).json({ error: 'Failed to fetch application tracking data.' });
+    return res.status(500).json({ error: 'Failed to fetch application tracking data: ' + err.message });
   }
 });
 

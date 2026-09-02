@@ -1,7 +1,8 @@
 import React from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
-import { FileCheck, Search, Phone, RefreshCw, FileText } from 'lucide-react';
+import { FileCheck, Search, Phone, RefreshCw, FileText, Check, CheckCircle2, XCircle, Clock, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const API_BASE = import.meta.env?.VITE_API_URL 
   || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -15,14 +16,14 @@ export default function ApplicationsScreen() {
   const [applications, setApplications] = React.useState([]);
   const [appSearchTerm, setAppSearchTerm] = React.useState('');
   const [isLoadingApps, setIsLoadingApps] = React.useState(false);
+  const [updatingAppId, setUpdatingAppId] = React.useState(null);
 
   const fetchApplications = async () => {
     setIsLoadingApps(true);
     try {
-      const res = await fetch(`${API_BASE}/integrations/applications`);
-      if (res.ok) {
-        const data = await res.json();
-        setApplications(data.applications || []);
+      const res = await axios.get(`${API_BASE}/integrations/applications`);
+      if (res.data) {
+        setApplications(res.data.applications || []);
       }
     } catch (err) {
       console.warn("Could not fetch submitted applications:", err);
@@ -34,6 +35,59 @@ export default function ApplicationsScreen() {
   React.useEffect(() => {
     fetchApplications();
   }, []);
+
+  const handleUpdateStatus = async (appId, newStatus, remarks = '') => {
+    setUpdatingAppId(appId);
+    try {
+      const res = await axios.patch(`${API_BASE}/integrations/applications/${appId}/status`, {
+        status: newStatus,
+        remarks: remarks || `Status marked as ${newStatus} by CSC Operator`
+      });
+
+      if (res.data && res.data.success) {
+        setApplications(prev => prev.map(a => 
+          (a.applicationId === appId || a._id === appId)
+            ? { ...a, status: newStatus, remarks: remarks || a.remarks, updatedAt: new Date() }
+            : a
+        ));
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      alert("Failed to update status: " + (err.response?.data?.error || err.message));
+    } finally {
+      setUpdatingAppId(null);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'VERIFIED':
+        return (
+          <span className="bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full text-[10px] font-extrabold inline-flex items-center gap-1 shadow-xs">
+            <Check size={10} className="text-amber-600" /> Docs Verified
+          </span>
+        );
+      case 'PROCESSED':
+        return (
+          <span className="bg-emerald-50 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded-full text-[10px] font-extrabold inline-flex items-center gap-1 shadow-xs">
+            <CheckCircle2 size={10} className="text-emerald-600" /> Approved & Disbursed
+          </span>
+        );
+      case 'REJECTED':
+        return (
+          <span className="bg-red-50 text-red-700 border border-red-300 px-2 py-0.5 rounded-full text-[10px] font-extrabold inline-flex items-center gap-1 shadow-xs">
+            <XCircle size={10} className="text-red-600" /> Rejected
+          </span>
+        );
+      case 'SUBMITTED':
+      default:
+        return (
+          <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-[10px] font-extrabold inline-flex items-center gap-1 shadow-xs">
+            <Clock size={10} className="text-blue-600" /> Submitted
+          </span>
+        );
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in p-6">
@@ -83,9 +137,9 @@ export default function ApplicationsScreen() {
                 <th className="px-4 py-3">{t.beneficiaryName || 'Beneficiary Name'}</th>
                 <th className="px-4 py-3">{t.whatsappNumber || 'WhatsApp Number'}</th>
                 <th className="px-4 py-3">{t.schemeName || 'Scheme Name'}</th>
-                <th className="px-4 py-3">{t.districtState || 'District / State'}</th>
-                <th className="px-4 py-3">{t.incomeCat || 'Income / Cat'}</th>
-                <th className="px-4 py-3">{t.submitted || 'Submitted'}</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-center">Actions</th>
+                <th className="px-4 py-3 text-right">Track</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-gray-800">
@@ -99,37 +153,95 @@ export default function ApplicationsScreen() {
                     app.applicant?.phone?.includes(term)
                   );
                 })
-                .map((app) => (
-                  <tr key={app._id || app.applicationId} className="hover:bg-amber-50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-amber-700">{app.applicationId}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-slate-900">{app.applicant?.fullName || 'N/A'}</div>
-                      <div className="text-xs text-slate-500 font-medium">
-                        {app.applicant?.age ? `${app.applicant.age} Yrs` : ''} {app.applicant?.gender || ''}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-                        <Phone size={14} className="text-slate-400" />
-                        <span>+91 {app.applicant?.phone}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-slate-900 max-w-[200px] truncate" title={app.schemeName}>
-                      {app.schemeName}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      <div>{app.applicant?.district || 'N/A'}</div>
-                      <div className="text-xs text-slate-400 font-medium">{app.applicant?.state || ''}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-slate-800">₹{(app.applicant?.annualIncome || 0).toLocaleString('en-IN')}</div>
-                      <div className="text-xs text-slate-400 font-medium">{app.applicant?.casteCategory || 'General'}</div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
-                      {app.createdAt ? new Date(app.createdAt).toLocaleDateString() : 'Recent'}
-                    </td>
-                  </tr>
-                ))}
+                .map((app) => {
+                  const currentStatus = app.status || 'SUBMITTED';
+                  const isBusy = updatingAppId === app.applicationId;
+
+                  return (
+                    <tr key={app._id || app.applicationId} className="hover:bg-amber-50 transition-colors">
+                      <td className="px-4 py-3 font-mono font-bold text-amber-700">{app.applicationId}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-slate-900">{app.applicant?.fullName || 'N/A'}</div>
+                        <div className="text-xs text-slate-500 font-medium">
+                          {app.applicant?.age ? `${app.applicant.age} Yrs • ` : ''} {app.applicant?.gender || ''}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+                          <Phone size={14} className="text-slate-400" />
+                          <span>+91 {app.applicant?.phone}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-900 max-w-[200px] truncate" title={app.schemeName}>
+                        {app.schemeName}
+                      </td>
+                      <td className="px-4 py-3">
+                        {getStatusBadge(currentStatus)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {currentStatus === 'SUBMITTED' && (
+                            <>
+                              <button
+                                onClick={() => handleUpdateStatus(app.applicationId, 'VERIFIED')}
+                                disabled={isBusy}
+                                className="px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs"
+                              >
+                                {isBusy ? '...' : 'Verify'}
+                              </button>
+                              <button
+                                onClick={() => handleUpdateStatus(app.applicationId, 'REJECTED', 'Documents rejected')}
+                                disabled={isBusy}
+                                className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {currentStatus === 'VERIFIED' && (
+                            <>
+                              <button
+                                onClick={() => handleUpdateStatus(app.applicationId, 'PROCESSED')}
+                                disabled={isBusy}
+                                className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                              >
+                                {isBusy ? '...' : 'Approve'}
+                              </button>
+                              <button
+                                onClick={() => handleUpdateStatus(app.applicationId, 'REJECTED', 'Application rejected')}
+                                disabled={isBusy}
+                                className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {currentStatus === 'PROCESSED' && (
+                            <span className="text-emerald-700 font-bold text-xs">Approved ✓</span>
+                          )}
+                          {currentStatus === 'REJECTED' && (
+                            <button
+                              onClick={() => handleUpdateStatus(app.applicationId, 'SUBMITTED')}
+                              disabled={isBusy}
+                              className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs"
+                            >
+                              Re-open
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => navigate('/tracking')}
+                          className="text-blue-600 hover:text-blue-800 font-bold text-xs inline-flex items-center gap-1 hover:underline"
+                        >
+                          <span>Track</span>
+                          <ExternalLink size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               {applications.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-16 text-gray-400 font-medium text-sm">
@@ -141,15 +253,6 @@ export default function ApplicationsScreen() {
             </tbody>
           </table>
         </div>
-      </div>
-      
-      <div className="text-center pt-4">
-        <button
-          onClick={() => navigate('/')}
-          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 px-6 py-3 rounded font-bold text-sm transition-all shadow-xs"
-        >
-          &larr; {t.backToPortalHome || 'Back to Portal Home'}
-        </button>
       </div>
     </div>
   );
