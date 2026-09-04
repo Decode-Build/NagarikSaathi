@@ -1,13 +1,12 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import { Application } from '../models.js';
+import { Application, OtpSession } from '../models.js';
 
 const router = express.Router();
 
-// In-memory OTP storage with TTL (5 minutes)
+// In-memory OTP storage fallback with periodic cleanup (5 minutes TTL)
 const otpStore = new Map();
 
-// Helper to clean up expired OTPs periodically
 setInterval(() => {
   const now = Date.now();
   for (const [phone, data] of otpStore.entries()) {
@@ -30,6 +29,51 @@ const normalizePhone = (rawPhone) => {
     countryCode: countryCode,
     plusCountryCode: '+' + countryCode
   };
+};
+
+/**
+ * Helper to save OTP session to MongoDB and fallback Map
+ */
+const saveOtpRecord = async (phone10, generatedOtp, purpose = 'scheme_application') => {
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+  // Always update in-memory cache
+  otpStore.set(phone10, {
+    code: generatedOtp,
+    expiresAt,
+    verified: false,
+    attempts: 0
+  });
+
+  // Persist to MongoDB with TTL if connected
+  if (mongoose.connection.readyState === 1) {
+    try {
+      await OtpSession.deleteMany({ phone: phone10 });
+      await OtpSession.create({
+        phone: phone10,
+        code: generatedOtp,
+        purpose,
+        verified: false,
+        attempts: 0
+      });
+    } catch (dbErr) {
+      console.warn('Could not persist OTP session to MongoDB:', dbErr.message);
+    }
+  }
+};
+
+/**
+ * Helper to retrieve and verify OTP from MongoDB or fallback Map
+ */
+const lookupOtpRecord = async (phone10) => {
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const doc = await OtpSession.findOne({ phone: phone10 }).sort({ createdAt: -1 });
+      if (doc) return doc;
+    } catch (dbErr) {
+      console.warn('Could not lookup OTP in MongoDB:', dbErr.message);
+    }
+  }
+  return otpStore.get(phone10) || null;
 };
 
 /**
@@ -133,7 +177,7 @@ router.post('/whatsapp-share', async (req, res) => {
 
 /**
  * 2. POST /api/integrations/send-otp
- * Triggers Workflow 3 (Send OTP to WhatsApp)
+ * Triggers Workflow 3 (Send OTP to WhatsApp) with Persistent DB + Memory Backup
  */
 router.post('/send-otp', async (req, res) => {
   try {
@@ -150,14 +194,7 @@ router.post('/send-otp', async (req, res) => {
 
     // Generate 6-digit OTP
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
-
-    otpStore.set(phoneInfo.raw10, {
-      code: generatedOtp,
-      expiresAt,
-      verified: false,
-      attempts: 0
-    });
+    await saveOtpRecord(phoneInfo.raw10, generatedOtp, purpose);
 
     const formattedOtpMessage = `🔐 *NagarikSaathi Verification Code*\n\nYour 6-digit OTP verification code is: *${generatedOtp}*\n\n⏳ Valid for 5 minutes. Do not share this code with anyone.\n\n🇮🇳 _NagarikSaathi - Government Schemes Assistance Platform_`;
 
@@ -233,7 +270,7 @@ router.post('/send-otp', async (req, res) => {
 
 /**
  * 3. POST /api/integrations/verify-otp
- * Verifies the OTP entered by citizen
+ * Verifies the OTP entered by citizen with DB / Memory reconciliation
  */
 router.post('/verify-otp', async (req, res) => {
   try {
@@ -243,8 +280,8 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Phone number and OTP are required.' });
     }
 
-    const cleanPhone = String(phone).replace(/\D/g, '');
-    const record = otpStore.get(cleanPhone);
+    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+    const record = await lookupOtpRecord(cleanPhone);
 
     // If custom n8n OTP verify webhook is configured
     const n8nVerifyWebhookUrl = process.env.N8N_OTP_VERIFY_WEBHOOK;
@@ -277,25 +314,39 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'No OTP requested for this phone number or OTP expired.' });
     }
 
-    if (Date.now() > record.expiresAt) {
-      otpStore.delete(cleanPhone);
-      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+    // Rate limiting attempts
+    const currentAttempts = (record.attempts || 0) + 1;
+    if (typeof record.save === 'function') {
+      record.attempts = currentAttempts;
+      await record.save();
+    } else {
+      record.attempts = currentAttempts;
     }
 
-    record.attempts = (record.attempts || 0) + 1;
-    if (record.attempts > 5) {
+    if (currentAttempts > 5) {
+      if (mongoose.connection.readyState === 1) {
+        await OtpSession.deleteMany({ phone: cleanPhone });
+      }
       otpStore.delete(cleanPhone);
       return res.status(429).json({ error: 'Too many incorrect attempts. Please request a new OTP.' });
     }
 
-    if (record.code !== String(otp).trim()) {
+    if (String(record.code).trim() !== String(otp).trim()) {
       return res.status(400).json({ error: 'Invalid OTP. Please check and try again.' });
     }
 
     // Mark as verified
-    record.verified = true;
     const verificationToken = `vtok_${Buffer.from(`${cleanPhone}:${Date.now()}`).toString('base64')}`;
-    record.token = verificationToken;
+    if (typeof record.save === 'function') {
+      record.verified = true;
+      record.token = verificationToken;
+      await record.save();
+    }
+    const memRecord = otpStore.get(cleanPhone);
+    if (memRecord) {
+      memRecord.verified = true;
+      memRecord.token = verificationToken;
+    }
 
     return res.json({
       success: true,
@@ -321,9 +372,9 @@ router.post('/submit-application', async (req, res) => {
       return res.status(400).json({ error: 'Scheme name and applicant details are required.' });
     }
 
-    const cleanPhone = applicant.phone ? String(applicant.phone).replace(/\D/g, '') : '';
-    const verifiedRecord = cleanPhone ? otpStore.get(cleanPhone) : null;
-    const isPhoneVerified = verifiedRecord ? verifiedRecord.verified : Boolean(verificationToken);
+    const cleanPhone = applicant.phone ? String(applicant.phone).replace(/\D/g, '').slice(-10) : '';
+    const verifiedRecord = cleanPhone ? await lookupOtpRecord(cleanPhone) : null;
+    const isPhoneVerified = (verifiedRecord && verifiedRecord.verified) || Boolean(verificationToken);
 
     // Strict Security Guard: Enforce OTP verification before allowing form generation
     if (!isPhoneVerified) {

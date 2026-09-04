@@ -62,6 +62,7 @@ import schemeRoutes from './routes/schemes.js';
 import integrationsRoutes from './routes/integrations.js';
 import documentsRoutes from './routes/documents.js';
 import audioRoutes from './routes/audio.js';
+import aiRoutes from './routes/ai.js';
 
 // Setup Routes
 app.use('/api/auth', authRoutes);
@@ -69,6 +70,7 @@ app.use('/api', schemeRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/audio', audioRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Initialize Gemini LLM
 let genAI = null;
@@ -239,18 +241,30 @@ app.post('/api/settings/apikey', requireAuth, (req, res) => {
 
 // Auth routes have been moved to routes/auth.js
 
-// Cosine similarity helper
-const cosineSimilarity = (vecA, vecB) => {
+// Optimized Cosine similarity with WeakMap vector norm caching
+const vectorNormCache = new WeakMap();
+
+const getVectorNorm = (vec) => {
+  if (!Array.isArray(vec)) return 0;
+  if (vectorNormCache.has(vec)) return vectorNormCache.get(vec);
+  let sum = 0;
+  for (let i = 0; i < vec.length; i++) sum += vec[i] * vec[i];
+  const norm = Math.sqrt(sum);
+  vectorNormCache.set(vec, norm);
+  return norm;
+};
+
+export const cosineSimilarity = (vecA, vecB) => {
+  if (!vecA || !vecB || vecA.length === 0 || vecB.length === 0 || vecA.length !== vecB.length) return 0;
+  const normA = getVectorNorm(vecA);
+  const normB = getVectorNorm(vecB);
+  if (normA === 0 || normB === 0) return 0;
+
   let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
   for (let i = 0; i < vecA.length; i++) {
     dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
   }
-  if (normA === 0 || normB === 0) return 0;
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  return dotProduct / (normA * normB);
 };
 
 // Rate limiter for chat to prevent abuse
