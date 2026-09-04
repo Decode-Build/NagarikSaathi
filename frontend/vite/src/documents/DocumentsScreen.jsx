@@ -183,36 +183,81 @@ export default function DocumentsScreen() {
         )}
 
         {verificationResult && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 space-y-4 animate-fade-in-up">
-            <h4 className="font-bold text-slate-800 border-b border-slate-200 pb-2">Verification Results</h4>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 space-y-5 animate-fade-in-up shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+              <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                {lang === 'hi' ? 'दस्तावेज़ सत्यापन एवं मिलान परिणाम' : 'Document Verification & Reconciliation'}
+              </h4>
+              {verificationResult.matchMetrics?.nameMatchScore !== undefined && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    {lang === 'hi' ? 'नाम मिलान स्कोर:' : 'Name Match:'}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    verificationResult.matchMetrics.nameMatchStatus === 'MATCH'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : verificationResult.matchMetrics.nameMatchStatus === 'PARTIAL_MATCH'
+                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                      : 'bg-red-100 text-red-800 border border-red-300'
+                  }`}>
+                    {verificationResult.matchMetrics.nameMatchScore}% ({verificationResult.matchMetrics.nameMatchStatus})
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {verificationResult.matchMetrics?.reconciliationNotes && (
+              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-lg text-xs text-blue-900 leading-relaxed flex items-start gap-2">
+                <span className="font-bold text-blue-700 uppercase tracking-wider">AI Reconciliation:</span>
+                <span>{verificationResult.matchMetrics.reconciliationNotes}</span>
+              </div>
+            )}
             
             <div className="grid md:grid-cols-2 gap-6">
               {/* OCR Extraction */}
               <div>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Extracted Data</span>
-                <ul className="mt-2 space-y-2 text-sm font-mono bg-white p-3 border border-slate-200 rounded">
-                  <li><span className="text-slate-400">Name:</span> {verificationResult.extractedData?.extractedName || 'N/A'}</li>
-                  <li><span className="text-slate-400">DOB:</span> {verificationResult.extractedData?.dob || 'N/A'}</li>
-                  <li><span className="text-slate-400">ID:</span> {verificationResult.extractedData?.idNumber || 'N/A'}</li>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  {lang === 'hi' ? 'पहचाने गए फ़ील्ड (DPDP सुरक्षित)' : 'Extracted Fields (DPDP Masked)'}
+                </span>
+                <ul className="mt-2 space-y-2 text-sm font-mono bg-white p-3.5 border border-slate-200 rounded-lg shadow-xs">
+                  <li className="flex justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-slate-400 font-sans">Name:</span> 
+                    <span className="font-bold text-slate-800">{verificationResult.extractedData?.extractedName || 'N/A'}</span>
+                  </li>
+                  <li className="flex justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-slate-400 font-sans">DOB:</span> 
+                    <span className="text-slate-700">{verificationResult.extractedData?.dob || 'N/A'}</span>
+                  </li>
+                  <li className="flex justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-slate-400 font-sans">Masked ID:</span> 
+                    <span className="font-bold text-emerald-700">{verificationResult.extractedData?.idNumber || 'N/A'}</span>
+                  </li>
+                  <li className="flex justify-between pt-0.5">
+                    <span className="text-slate-400 font-sans">Authority:</span> 
+                    <span className="text-slate-600 text-xs">{verificationResult.extractedData?.issuingAuthority || 'Govt Authority'}</span>
+                  </li>
                 </ul>
               </div>
 
               {/* Checklist */}
               <div>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">AI Checklist</span>
-                <ul className="mt-2 space-y-2 text-sm">
-                  {verificationResult.verificationResults.matches.map((m, i) => (
-                    <li key={`m-${i}`} className="flex items-start gap-2 text-green-700">
-                      <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" /> {m}
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  {lang === 'hi' ? 'सत्यापन चेकलिस्ट' : 'Verification Checks'}
+                </span>
+                <ul className="mt-2 space-y-2 text-xs bg-white p-3.5 border border-slate-200 rounded-lg shadow-xs">
+                  {verificationResult.verificationResults?.matches?.map((m, i) => (
+                    <li key={`m-${i}`} className="flex items-start gap-2 text-emerald-700 font-medium">
+                      <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-600" /> {m}
                     </li>
                   ))}
-                  {verificationResult.verificationResults.missing.map((m, i) => (
-                    <li key={`mis-${i}`} className="flex items-start gap-2 text-red-600">
+                  {verificationResult.verificationResults?.missing?.map((m, i) => (
+                    <li key={`mis-${i}`} className="flex items-start gap-2 text-red-600 font-medium">
                       <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> {m}
                     </li>
                   ))}
-                  {verificationResult.verificationResults.mismatches.map((m, i) => (
-                    <li key={`err-${i}`} className="flex items-start gap-2 text-amber-600">
+                  {verificationResult.verificationResults?.mismatches?.map((m, i) => (
+                    <li key={`err-${i}`} className="flex items-start gap-2 text-amber-700 font-medium">
                       <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> {m}
                     </li>
                   ))}
