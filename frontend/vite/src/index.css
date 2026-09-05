@@ -38,53 +38,108 @@
 
 /* Custom Print Styles */
 @media print {
-  /* Reset margins for printing */
+  /* Reset page margins and dimensions */
   @page {
-    margin: 15mm;
+    margin: 12mm 15mm;
+    size: auto;
   }
 
-  body {
-    background-color: white !important;
-    color: black !important;
-    font-family: 'Inter', sans-serif !important;
+  html, body, #root {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #0f172a !important;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  /* Reset flex containers and layout locks to allow natural print flow */
+  .flex,
+  .flex-col,
+  .flex-1,
+  .min-w-0,
+  .h-screen,
+  main,
+  .overflow-hidden,
+  .overflow-y-auto {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    position: static !important;
+  }
+
+  /* Hide navigation, sidebar, header, action buttons, and non-printable elements */
+  header,
+  aside,
+  nav,
+  button,
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
   }
-  
-  /* Hide all elements that are not marked for printing */
-  body > *:not(.print-container) {
-    display: none !important;
+
+  /* Display elements marked specifically for print output */
+  .print-only,
+  .print\:flex {
+    display: flex !important;
+    visibility: visible !important;
   }
-  
-  /* Ensure the print container is shown properly */
+
+  .print-only-block {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Ensure the printable container displays cleanly across print pages */
   .print-container {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: static !important;
     width: 100% !important;
-    color: black !important;
-    background-color: white !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 1rem !important;
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
   }
 
-  /* Force display of elements that might be hidden by default (e.g. text color or badges) */
-  .print-badge {
-    border: 1px solid black !important;
-    color: black !important;
-    background: none !important;
-  }
-
-  /* Prevent page breaks inside cards */
+  /* Prevent awkward page breaks inside cards */
   .print-card {
+    break-inside: avoid;
     page-break-inside: avoid;
-    border: 1px solid #e5e7eb !important;
+    border: 1px solid #cbd5e1 !important;
     border-radius: 0.5rem !important;
     padding: 1.5rem !important;
-    margin-bottom: 1.5rem !important;
+    background-color: #ffffff !important;
+    box-shadow: none !important;
   }
 
-  /* Hide print buttons and other interactive elements in print view */
-  .no-print {
-    display: none !important;
+  .print-badge {
+    border: 1px solid #475569 !important;
+    color: #0f172a !important;
+    background: #f8fafc !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure background colors and borders are preserved when printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
   }
 }
+

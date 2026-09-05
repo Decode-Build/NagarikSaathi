@@ -17,15 +17,22 @@ const getGenAI = () => {
   return new GoogleGenerativeAI(apiKey);
 };
 
-const generateWithModelFallback = async (genAI, contents) => {
-  const models = ['gemini-3.6-flash', 'gemini-3.5-flash'];
+const generateWithModelFallback = async (genAI, contents, customConfig = {}) => {
+  const models = ['gemini-3.5-flash', 'gemini-3.6-flash'];
   let lastError = null;
   for (const modelName of models) {
     try {
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const model = genAI.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 100,
+          ...customConfig
+        }
+      });
       const result = await Promise.race([
         model.generateContent(contents),
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout on ${modelName}`)), 14000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout on ${modelName}`)), 6000))
       ]);
       return result;
     } catch (err) {

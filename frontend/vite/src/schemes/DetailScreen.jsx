@@ -217,7 +217,7 @@ export default function DetailScreen({
         </div>
 
         {/* Signature Block (Only visible during print) */}
-        <div className="hidden print:flex justify-between items-end mt-12 pt-12 border-t border-slate-300">
+        <div className="hidden print:flex print-only justify-between items-end mt-12 pt-12 border-t border-slate-300">
           <div className="text-center">
             <div className="w-40 border-b border-gray-200 mb-2"></div>
             <p className="text-xs font-bold text-slate-800">Citizen Signature / Thumbprint</p>
