@@ -6,16 +6,32 @@ import { schemesData, demoSessions, demoProfiles } from '../seed.js';
 
 const router = express.Router();
 
+// In-memory caching for sub-millisecond scheme retrieval & network resilience
+let cachedSchemes = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 // Helper to get raw schemes from DB or in-memory fallback
 const getAllSchemes = async () => {
+  if (cachedSchemes && cachedSchemes.length > 0 && (Date.now() - cacheTimestamp < CACHE_TTL)) {
+    return cachedSchemes;
+  }
   if (mongoose.connection.readyState === 1) {
-    try {
-      const dbSchemes = await Scheme.find({});
-      if (dbSchemes && dbSchemes.length > 0) return dbSchemes;
+      const dbFetchPromise = Scheme.find({}).lean().exec();
+      dbFetchPromise.catch(() => {}); // Prevent unhandled rejection if race times out
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Atlas query timeout')), 2500));
+      const dbSchemes = await Promise.race([dbFetchPromise, timeoutPromise]);
+      if (dbSchemes && dbSchemes.length > 0) {
+        cachedSchemes = dbSchemes;
+        cacheTimestamp = Date.now();
+        return dbSchemes;
+      }
     } catch (e) {
-      console.warn("DB query failed, fallback to in-memory schemes:", e.message);
+      console.warn("DB query timed out or failed, using in-memory schemes:", e.message);
     }
   }
+  cachedSchemes = schemesData;
+  cacheTimestamp = Date.now();
   return schemesData;
 };
 
@@ -288,7 +304,7 @@ router.get('/schemes', async (req, res) => {
         total: schemes.length,
         page,
         limit,
-        totalPages: Math.ceil(schemes.length / limit),
+        totalPages: Math.max(1, Math.ceil(schemes.length / limit)),
         schemes: paginatedSchemes
       });
     } else {

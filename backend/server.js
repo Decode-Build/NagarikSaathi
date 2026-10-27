@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -11,6 +12,7 @@ import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -47,6 +49,12 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON payload' });
+  }
+  next(err);
+});
 app.use(zeroStorageComplianceMiddleware);
 
 // Connect Database
@@ -71,6 +79,25 @@ app.use('/api/integrations', integrationsRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/ai', aiRoutes);
+
+// Health Check Endpoints (For Cloud Deployment Monitoring / Render Health Probe)
+const healthHandler = (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'offline/fallback';
+  res.status(200).json({
+    status: 'healthy',
+    service: 'NagarikSaathi API Gateway',
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    database: {
+      status: dbStatus,
+      host: mongoose.connection.host || 'local'
+    },
+    aiEngine: genAI ? 'Gemini 3.5 Flash Active' : 'Fallback Engine',
+    version: '1.0.0'
+  });
+};
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 // Initialize Gemini LLM
 let genAI = null;
@@ -397,7 +424,7 @@ app.post('/api/chat', chatLimiter, dpdpPurposeLimitationMiddleware, async (appRe
       '\nRespond ONLY with the JSON object. No text before or after.';
 
     if (genAI) {
-      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash'];
+      const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
       for (const mName of modelsToTry) {
         try {
           const geminiModel = genAI.getGenerativeModel({
@@ -1190,7 +1217,9 @@ app.post('/api/rules/reject/:id', async (req, res) => {
 });
 
 // Serve static frontend files from Vite build
-const frontendDist = path.join(__dirname, '../frontend/vite/dist');
+const frontendDist = fs.existsSync(path.join(__dirname, '../frontend/dist'))
+  ? path.join(__dirname, '../frontend/dist')
+  : path.join(__dirname, '../frontend/vite/dist');
 app.use(express.static(frontendDist));
 
 // Wildcard fallback router to serve index.html for React SPA routing
@@ -1199,6 +1228,14 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(frontendDist, 'index.html'));
   } else {
     res.status(404).json({ error: "API endpoint not found." });
+  }
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error("Unhandled API error:", err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: "Internal server error: " + (err.message || String(err)) });
   }
 });
 

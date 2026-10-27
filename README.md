@@ -71,6 +71,36 @@ Citizen Speaks (Hindi/Hinglish Voice)
 
 ---
 
+## 🖥️ Platform Showcase & User Interface
+
+<p align="center">
+  <b>National Digital Public Infrastructure (DPI) Portal Design · High-Contrast Government Theme · Zero AI Artifacts</b>
+</p>
+
+### 1. 🇮🇳 Citizen Discovery & Bilingual Voice Hero
+![Citizen Discovery & Voice Hero](frontend/public/assets/landing_ui.png)
+*Figure 1: Citizen landing screen with Ashoka Chakra ribbon, live CSC Sehore Center status (`MP-CSC-8921`), bilingual Hindi/English voice AI microphone, 4 live impact metric cards, and category exploration tiles.*
+
+---
+
+### 2. ⚡ Multi-Variable Eligibility Screener (1-Click Personas)
+![Multi-Variable Eligibility Screener](frontend/public/assets/screener_ui.png)
+*Figure 2: Multi-parameter screener with 1-click citizen presets (🌾 Small Farmer, 👩‍👧 Rural Woman, 🎓 Student, 🔨 Artisan), land holding slider, annual income filter, and NPCI-DBT compliance indicator.*
+
+---
+
+### 3. 📋 Verified Welfare Schemes Catalog (1,050+ Central & State Schemes)
+![Verified Schemes Catalog](frontend/public/assets/schemes_ui.png)
+*Figure 3: Catalog of 1,050+ ingested government schemes with state filters, category facets, direct benefit transfer (DBT) pills, and match score computation.*
+
+---
+
+### 4. 🛰️ Real-Time 4-Stage Application Tracker
+![Real-Time Application Tracker](frontend/public/assets/tracking_ui.png)
+*Figure 4: Instant application tracking interface (`NS-APP-2026-XXXX`) with stage verification timeline (Submitted ➔ Document Verification ➔ Sanction ➔ DBT Disbursal).*
+
+---
+
 ## 🏗️ System Architecture
 
 ```mermaid
@@ -99,7 +129,7 @@ flowchart TB
     end
 
     subgraph StorageLayer ["Persistence & Cache"]
-        MongoDB[("MongoDB (Schemes, Users, Applications)")]
+        MongoDB[("MongoDB (1,050+ Schemes, Applications)")]
         TTLStore[("TTL OtpSessions (300s Expire)")]
     end
 
@@ -117,41 +147,44 @@ flowchart TB
 
 ```
 NagarikSaathi/
-├── backend/                       # Express.js API Server
-│   ├── server.js                  # Main server & RAG chat engine
-│   ├── db.js                      # MongoDB connection pool
-│   ├── models.js                  # Mongoose models (Scheme, User, OtpSession, Application, DraftRule)
-│   ├── rag_eval.js                # 20-query RAG accuracy benchmark harness
-│   ├── seed.js                    # 1,000+ Welfare schemes seed dataset
+├── backend/                       # Production Express.js API Server Gateway
+│   ├── server.js                  # Main server, static dist handler & RAG engine
+│   ├── db.js                      # MongoDB connection pool & auto-reconnect
+│   ├── models.js                  # Schemas (Scheme, User, OtpSession, Application, DraftRule)
+│   ├── seed.js                    # 1,050+ Central & State welfare schemes
+│   ├── rag_eval.js                # 20-query automated RAG benchmark suite
+│   ├── package.json               # Backend dependencies and scripts
 │   ├── middlewares/
-│   │   └── compliance.js          # DPDP Zero-Storage & Purpose Limitation enforcement
-│   ├── routes/
-│   │   ├── ai.js                  # Tavily Live Search, Gazette Parser & Intent Engine
-│   │   ├── documents.js           # Vision OCR & Indian Name Reconciliation Engine
-│   │   ├── integrations.js        # Persistent OTP, n8n WhatsApp alerts & Application tracking
-│   │   ├── schemes.js             # Scheme search, eligibility filter, VLE analytics
-│   │   ├── audio.js               # Gemini Multimodal Audio transcription & TTS
-│   │   └── auth.js                # Operator JWT authentication
-│   └── .env.example               # Secure environment template
+│   │   └── compliance.js          # DPDP Act 2023 zero-storage & masking enforcement
+│   └── routes/
+│       ├── ai.js                  # Tavily live web search, gazette parser & intent engine
+│       ├── documents.js           # Vision OCR & Indian Name Reconciliation engine
+│       ├── integrations.js        # Persistent OTP, n8n WhatsApp alerts & tracking
+│       ├── schemes.js             # Scheme search, eligibility filter, VLE analytics
+│       ├── audio.js               # Multimodal speech-to-text & TTS synthesis
+│       └── auth.js                # Operator JWT session authentication
 │
-├── frontend/
-│   ├── vite/                      # Primary High-Performance React 19 SPA (Production UI)
-│   │   └── src/
-│   │       ├── pages/             # Landing, Session Toggle & How-It-Works
-│   │       ├── schemes/           # Eligibility Screener & Scheme Detail view
-│   │       ├── chatbot/           # Bilingual AI Saathi Assistant
-│   │       ├── documents/         # Document verification & WhatsApp share modal
-│   │       ├── dashboard/         # VLE impact dashboard & Application registry
-│   │       ├── tracking/          # Real-time multi-stage application tracker
-│   │       └── i18n/              # Hindi/English Language Context
-│   └── nextjs/                    # Next.js App Router companion interface
+├── frontend/                      # React 19 + Vite Single Page Application
+│   ├── src/
+│   │   ├── pages/                 # LandingScreen, SessionToggle, HowItWorks
+│   │   ├── schemes/               # EligibilityScreener, ResultsScreen, DetailScreen
+│   │   ├── chatbot/               # Bilingual ChatScreen with voice microphone
+│   │   ├── dashboard/             # VLE Operator console & Applications registry
+│   │   ├── tracking/              # Live 4-stage tracking screen
+│   │   ├── documents/             # Documents verification & WhatsApp modals
+│   │   ├── layouts/               # Header (Tricolor ribbon) & Sidebar
+│   │   └── i18n/                  # Hindi / English bilingual context
+│   ├── public/                    # Handouts (demo PDF), assets, screenshots
+│   ├── package.json               # Frontend dependencies & Vite scripts
+│   └── vite.config.js             # Vite build configuration
 │
-├── ai/                            # Python Batch Gazette Ingest CLI Suite
+├── ai/                            # Python Batch Circular & Gazette Ingestion Suite
 │   ├── extract_rule.py            # PDF circular rule extractor
 │   ├── main.py                    # Standalone intent-to-match pipeline
-│   └── models.py                  # Pydantic DraftRule schemas
+│   └── models.py                  # Pydantic schemas for DraftRule
 │
-└── package.json                   # Monorepo root scripts
+├── .gitignore                     # Git ignore configuration
+└── README.md                      # Comprehensive project documentation
 ```
 
 ---
@@ -223,21 +256,70 @@ TAVILY_API_KEY=your_tavily_api_key_here
 JWT_SECRET=your_super_secret_jwt_key_here
 ```
 
-### 3. Install All Monorepo Dependencies
+### 3. Build & Run (Production Ready)
+
+**Step A: Build Frontend (Vite + React 19)**
 ```bash
-npm run install-all
+cd frontend
+npm install
+npm run build
+cd ..
+```
+*Outputs optimized static assets to `frontend/dist` in ~1.5 seconds.*
+
+**Step B: Install & Seed Backend**
+```bash
+cd backend
+npm install
+npm run seed     # Ingests 1,050+ Central & State welfare schemes into MongoDB
 ```
 
-### 4. Seed 1,000+ Government Schemes
+**Step C: Start Production Server**
 ```bash
-npm run seed
+npm start
 ```
+*Express automatically serves the compiled frontend single-page application at `http://localhost:5000` alongside all API routes.*
 
-### 5. Start the Production Dev Server
-```bash
-npm run dev
+---
+
+## 🚀 Cloud Deployment Guide (100% Deploy Ready)
+
+NagarikSaathi is architected for zero-configuration deployment to any cloud provider:
+
+### Option 1: Render / Railway / Heroku
+* **Root Directory**: `.` (Repository root)
+* **Build Command**: `cd frontend && npm install && npm run build && cd ../backend && npm install`
+* **Start Command**: `cd backend && npm start`
+* **Health Check Endpoint**: `/health` (or `/api/health`) — Returns HTTP 200 with database status, uptime, and AI engine status:
+  ```json
+  {
+    "status": "healthy",
+    "service": "NagarikSaathi API Gateway",
+    "uptimeSeconds": 1024,
+    "database": { "status": "connected", "host": "mongodb.net" },
+    "aiEngine": "Gemini 3.5 Flash Active",
+    "version": "1.0.0"
+  }
+  ```
+
+### Option 2: Docker Containerization
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY backend/package*.json ./backend/
+RUN cd backend && npm install --production
+COPY backend/ ./backend/
+COPY --from=builder /app/frontend/dist ./frontend/dist
+EXPOSE 5000
+CMD ["node", "backend/server.js"]
 ```
-> Compiles the Vite React frontend into `dist/` and launches the Express backend on **http://localhost:5000**.
 
 ---
 
@@ -246,6 +328,7 @@ npm run dev
 NagarikSaathi includes an automated 20-query evaluation harness covering semantic queries, colloquial Hindi, out-of-domain requests, and edge cases.
 
 ```bash
+cd backend
 npm run eval
 ```
 
